@@ -1,5 +1,7 @@
 # Dotfiles bin utilities
-export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+# Auto-detect dotfiles location by following the .zshrc symlink
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname $(dirname $(readlink ~/.zshrc)))}"
+export DOTFILES_DIR
 export PATH="$DOTFILES_DIR/bin:$PATH"
 
 # Homebrew
