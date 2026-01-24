@@ -2,6 +2,11 @@
 
 # Source utils.sh from the same directory as this script
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DOTFILES_DIR="$(cd "$_SCRIPT_DIR/.." && pwd)"
+
+# Add bin to PATH for utility scripts
+export PATH="$_DOTFILES_DIR/bin:$PATH"
+
 . "$_SCRIPT_DIR/utils.sh"
 
 register_keyboard_shortcuts() {

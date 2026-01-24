@@ -2,36 +2,48 @@
 
 # Source utils.sh from the same directory as this script
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DOTFILES_DIR="$(cd "$_SCRIPT_DIR/.." && pwd)"
+
+# Add bin to PATH for utility scripts
+export PATH="$_DOTFILES_DIR/bin:$PATH"
+
 . "$_SCRIPT_DIR/utils.sh"
 
 run_brew_bundle() {
     brewfile="$_SCRIPT_DIR/../homebrew/Brewfile"
-    if [ -f $brewfile ]; then
-        # Run `brew bundle check`
+    caskfile="$_SCRIPT_DIR/../homebrew/Caskfile"
+
+    # Install from Brewfile (CLI tools)
+    if [ -f "$brewfile" ]; then
+        info "Installing CLI tools from Brewfile..."
         local check_output
         check_output=$(brew bundle check --file="$brewfile" 2>&1)
 
-        # Check if "The Brewfile's dependencies are satisfied." is contained in the output
         if echo "$check_output" | grep -q "The Brewfile's dependencies are satisfied."; then
-            warning "The Brewfile's dependencies are already satisfied."
+            success "Brewfile dependencies already satisfied."
         else
-            info "Satisfying missing dependencies with 'brew bundle install'..."
-            printf "\n"
-
-            # On Linux, skip casks (GUI apps don't work)
-            if [[ "$OSTYPE" != "darwin"* ]]; then
-                warning "Running on Linux - skipping casks (GUI apps)"
-                brew bundle install --file="$brewfile" --verbose --no-upgrade 2>&1 | grep -v "Skipping cask"
-            else
-                brew bundle install --file="$brewfile" --verbose
-            fi
-
-            printf "\n"
+            brew bundle install --file="$brewfile" --verbose
         fi
     else
         error "Brewfile not found"
         return 1
     fi
+
+    # Install from Caskfile (macOS apps) - only on macOS
+    if is-macos && [ -f "$caskfile" ]; then
+        printf "\n"
+        info "Installing macOS applications from Caskfile..."
+        local cask_check_output
+        cask_check_output=$(brew bundle check --file="$caskfile" 2>&1)
+
+        if echo "$cask_check_output" | grep -q "The Brewfile's dependencies are satisfied."; then
+            success "Caskfile dependencies already satisfied."
+        else
+            brew bundle install --file="$caskfile" --verbose
+        fi
+    fi
+
+    printf "\n"
 }
 
 if [ "$(basename "$0")" = "$(basename "${BASH_SOURCE[0]}")" ]; then

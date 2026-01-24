@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Check if a command is executable
+# Usage: is-executable <command>
+command -v "$1" &>/dev/null

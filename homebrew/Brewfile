@@ -1,9 +1,13 @@
+# Dotfiles management
+brew "stow"
+
 # File & search tools
 brew "bat"
 brew "eza"
 brew "fd"
 brew "fzf"
 brew "ripgrep"
+brew "tree"
 
 # Git tools
 brew "git"
@@ -14,6 +18,7 @@ brew "tig"
 
 # System monitoring
 brew "btop"
+brew "topgrade"  # Universal package updater
 
 # Development tools
 # brew "composer"  # Not needed - bundled with Herd
@@ -23,6 +28,7 @@ brew "jrnl"
 brew "mailpit", restart_service: :changed
 brew "neovim"
 brew "terminal-notifier"
+brew "wget"
 brew "xz"
 
 # Python
@@ -35,21 +41,6 @@ brew "zoxide"
 brew "zsh-autosuggestions"
 brew "zsh-syntax-highlighting"
 
-# Terminals
-cask "claude-code"
-cask "wezterm"
-
-# Development
-cask "db-browser-for-sqlite"
-cask "docker-desktop"
-cask "herd"
-
-# Utilities
-cask "hiddenbar"
-cask "openvpn-connect"
-cask "raycast"
-cask "rectangle"
-cask "shottr"
-cask "spotify"
-# cask "superwhisper"  # Temporarily disabled - slow download
-cask "winbox"
+# macOS-specific tools (auto-skipped on Linux)
+brew "dockutil" if OS.mac?
+brew "duti" if OS.mac?

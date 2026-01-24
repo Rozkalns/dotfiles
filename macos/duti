@@ -1,0 +1,33 @@
+# Default Application Associations
+# Format: <bundle_id> <file_extension> <role>
+# Roles: all (default), viewer, editor, shell
+
+# PHPStorm - Main code editor
+com.jetbrains.PhpStorm .php editor
+com.jetbrains.PhpStorm .js editor
+com.jetbrains.PhpStorm .jsx editor
+com.jetbrains.PhpStorm .ts editor
+com.jetbrains.PhpStorm .tsx editor
+com.jetbrains.PhpStorm .json editor
+com.jetbrains.PhpStorm .jsonc editor
+com.jetbrains.PhpStorm .md editor
+com.jetbrains.PhpStorm .html editor
+com.jetbrains.PhpStorm .css editor
+com.jetbrains.PhpStorm .scss editor
+com.jetbrains.PhpStorm .yaml editor
+com.jetbrains.PhpStorm .yml editor
+com.jetbrains.PhpStorm .xml editor
+com.jetbrains.PhpStorm .sql editor
+com.jetbrains.PhpStorm .sh editor
+com.jetbrains.PhpStorm .bash editor
+com.jetbrains.PhpStorm .zsh editor
+com.jetbrains.PhpStorm .env editor
+com.jetbrains.PhpStorm .gitignore editor
+com.jetbrains.PhpStorm .txt editor
+com.jetbrains.PhpStorm .log editor
+com.jetbrains.PhpStorm .ini editor
+com.jetbrains.PhpStorm .conf editor
+com.jetbrains.PhpStorm .toml editor
+
+# You can verify PHPStorm's bundle ID with:
+# osascript -e 'id of app "PhpStorm"'

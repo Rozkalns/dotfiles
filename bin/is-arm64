@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Check if running on ARM64 (Apple Silicon)
+[[ $(uname -m) == "arm64" ]]

@@ -2,6 +2,11 @@
 
 # Source utils.sh from the same directory as this script
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DOTFILES_DIR="$(cd "$_SCRIPT_DIR/.." && pwd)"
+
+# Add bin to PATH for utility scripts
+export PATH="$_DOTFILES_DIR/bin:$PATH"
+
 . "$_SCRIPT_DIR/utils.sh"
 
 install_xcode() {
@@ -17,10 +22,10 @@ install_xcode() {
 install_homebrew() {
     info "Installing Homebrew..."
 
-    if hash brew &>/dev/null; then
+    if is-executable brew; then
         warning "Homebrew already installed"
     else
-        if [[ "$OSTYPE" == "darwin"* ]]; then
+        if is-macos; then
             # macOS
             export HOMEBREW_CASK_OPTS="--appdir=/Applications"
             sudo --validate
@@ -28,10 +33,10 @@ install_homebrew() {
         else
             # Linux
             info "Installing build dependencies for Linux..."
-            if command -v apt-get &> /dev/null; then
+            if is-executable apt-get; then
                 sudo apt-get update
                 sudo apt-get install -y build-essential procps curl file git
-            elif command -v dnf &> /dev/null; then
+            elif is-executable dnf; then
                 sudo dnf groupinstall -y 'Development Tools'
                 sudo dnf install -y procps-ng curl file git
             fi

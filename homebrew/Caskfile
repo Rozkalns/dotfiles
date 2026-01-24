@@ -1,0 +1,21 @@
+# macOS Applications (Casks)
+# This file is only processed on macOS
+
+# Terminals
+cask "claude-code"
+cask "wezterm"
+
+# Development
+cask "db-browser-for-sqlite"
+cask "docker-desktop"
+cask "herd"
+
+# Utilities
+cask "hiddenbar"
+cask "openvpn-connect"
+cask "raycast"
+cask "rectangle"
+cask "shottr"
+cask "spotify"
+# cask "superwhisper"  # Temporarily disabled - slow download
+cask "winbox"

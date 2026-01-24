@@ -1,0 +1,83 @@
+# Git Configuration
+# Include this in your global git config:
+# git config --global include.path ~/.dotfiles/config/git/config
+# Or symlink to ~/.config/git/config
+
+[core]
+	excludesfile = ~/.config/git/ignore
+	editor = nvim
+	filemode = false
+	trustctime = false
+	autocrlf = input
+	untrackedCache = true
+	pager = delta
+	ignorecase = false
+
+[pull]
+	rebase = true
+
+[push]
+	default = simple
+	followTags = true
+	autoSetupRemote = true
+
+[fetch]
+	prune = true
+
+[init]
+	defaultBranch = main
+
+[rerere]
+	enabled = true
+
+[rebase]
+	autoStash = true
+
+[grep]
+	lineNumber = true
+
+[help]
+	autocorrect = 1
+
+[diff]
+	renames = copies
+	indentHeuristic = true
+	colorMoved = default
+
+[merge]
+	conflictstyle = diff3
+	defaultToUpstream = true
+
+[delta]
+	navigate = true
+	light = false
+	line-numbers = true
+	side-by-side = true
+
+[alias]
+	# Shortcuts
+	st = status
+	co = checkout
+	br = branch
+	ci = commit
+	amend = commit --amend --reuse-message=HEAD
+
+	# Logs
+	l = log --graph --abbrev-commit --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset'
+	ll = log --graph --abbrev-commit --pretty=oneline
+
+	# Diffs
+	d = diff
+	ds = -c delta.side-by-side=true diff
+
+	# Useful commands
+	undo = reset --soft HEAD^
+	unstage = reset HEAD --
+	last = log -1 HEAD
+	contributors = shortlog --summary --numbered
+
+	# Clean up merged branches
+	cleanup = "!git branch --merged | grep -v '\\*\\|main\\|master' | xargs -n 1 git branch -d"
+
+[color]
+	ui = auto

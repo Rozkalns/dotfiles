@@ -1,0 +1,43 @@
+# Topgrade Configuration
+# Run `topgrade --config-reference` to see all available options
+
+[misc]
+# Don't ask for confirmations
+assume_yes = true
+
+# Disable specific update steps you don't want
+# disable = ["containers", "git_repos"]
+disable = ["containers"]
+
+# Don't show elapsed time
+display_time = false
+
+# Clean up after updates
+cleanup = true
+
+# Run inside tmux/screen (useful for long updates over SSH)
+# run_in_tmux = true
+
+[commands]
+# Custom commands to run during updates
+# "npm" = "npm update --location global --force"
+
+[brew]
+# Automatically upgrade outdated casks
+# greedy = true
+
+[composer]
+# Update global composer packages
+# self_update = true
+
+[git]
+# Max number of concurrent git repos to update
+# max_concurrency = 5
+
+[linux]
+# Arch Linux specific
+# yay_arguments = "--devel"
+
+[python]
+# Enable pipx package updates
+# enable_pipx = true

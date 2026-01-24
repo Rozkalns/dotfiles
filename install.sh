@@ -3,12 +3,16 @@
 # Get the absolute path of the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Add bin to PATH for utility scripts
+export PATH="$SCRIPT_DIR/bin:$PATH"
+
 . $SCRIPT_DIR/scripts/utils.sh
 . $SCRIPT_DIR/scripts/prerequisites.sh
 . $SCRIPT_DIR/scripts/brew-install-custom.sh
 . $SCRIPT_DIR/scripts/themes.sh
 . $SCRIPT_DIR/scripts/osx-defaults.sh
 . $SCRIPT_DIR/scripts/symlinks.sh
+. $SCRIPT_DIR/macos/dock.sh
 
 info "Dotfiles installation initialized..."
 read -p "Install apps? [y/n] " install_apps
@@ -21,7 +25,7 @@ if [[ "$install_apps" == "y" ]]; then
     info "===================="
 
     # macOS-specific prerequisites
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+    if is-macos; then
         install_xcode
     fi
 
@@ -40,13 +44,48 @@ if [[ "$install_apps" == "y" ]]; then
     info "===================="
 
     install_catppuccin_themes
+
+    # macOS-specific setup that requires installed apps
+    if is-macos; then
+        printf "\n"
+        info "===================="
+        info "Dock Setup"
+        info "===================="
+
+        if is-executable dockutil; then
+            read -p "Configure Dock with preferred apps? [y/n] " configure_dock
+            if [[ "$configure_dock" == "y" ]]; then
+                setup_dock
+            fi
+        else
+            warning "dockutil not installed - skipping Dock setup"
+            info "Install with: brew install dockutil"
+        fi
+
+        printf "\n"
+        info "===================="
+        info "Default Applications"
+        info "===================="
+
+        if is-executable duti; then
+            read -p "Set default applications (PHPStorm for code files)? [y/n] " set_defaults
+            if [[ "$set_defaults" == "y" ]]; then
+                info "Setting default applications..."
+                duti "$SCRIPT_DIR/macos/duti"
+                success "Default applications configured!"
+            fi
+        else
+            warning "duti not installed - skipping default application setup"
+            info "Install with: brew install duti"
+        fi
+    fi
 fi
 
-# macOS-specific system defaults
-if [[ "$OSTYPE" == "darwin"* ]]; then
+# macOS system defaults (can run even without installing apps)
+if is-macos; then
     printf "\n"
     info "===================="
-    info "OSX System Defaults"
+    info "macOS System Defaults"
     info "===================="
 
     register_keyboard_shortcuts

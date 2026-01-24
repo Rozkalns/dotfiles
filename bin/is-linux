@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Check if running on Linux
+[[ "$OSTYPE" == "linux-gnu"* ]]

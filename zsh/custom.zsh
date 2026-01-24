@@ -1,3 +1,7 @@
+# Dotfiles bin utilities
+export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+export PATH="$DOTFILES_DIR/bin:$PATH"
+
 # Homebrew
 eval "$(/opt/homebrew/bin/brew shellenv)"
 export HOMEBREW_NO_AUTO_UPDATE=1

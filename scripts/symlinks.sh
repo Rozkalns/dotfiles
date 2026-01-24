@@ -2,7 +2,11 @@
 
 # Source utils.sh from the same directory as this script
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$_SCRIPT_DIR/../symlinks.conf"
+_DOTFILES_DIR="$(cd "$_SCRIPT_DIR/.." && pwd)"
+CONFIG_FILE="$_DOTFILES_DIR/symlinks.conf"
+
+# Add bin to PATH for utility scripts
+export PATH="$_DOTFILES_DIR/bin:$PATH"
 
 . "$_SCRIPT_DIR/utils.sh"
 

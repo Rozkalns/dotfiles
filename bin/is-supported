@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Check if a command with arguments is supported
+# Usage: is-supported <command> [args...]
+# Returns: 0 if supported, 1 if not
+# If more than 2 args, returns arg 2 or arg 3 based on support
+
+if [ $# -eq 1 ]; then
+    command -v "$1" &>/dev/null
+elif [ $# -eq 2 ]; then
+    $1 $2 &>/dev/null
+else
+    # Return either arg 2 or arg 3 based on whether arg 1 succeeds
+    if $1 &>/dev/null; then
+        echo "$2"
+    else
+        echo "$3"
+    fi
+fi
