@@ -23,7 +23,17 @@ setup_dock() {
     # Add your preferred apps
     info "Adding preferred apps to Dock..."
 
-    # Browsers
+    # Communication & Productivity (First - most used)
+    [ -d "/System/Applications/Mail.app" ] && \
+        dockutil --no-restart --add "/System/Applications/Mail.app"
+
+    [ -d "/System/Applications/Messages.app" ] && \
+        dockutil --no-restart --add "/System/Applications/Messages.app"
+
+    [ -d "/System/Applications/Calendar.app" ] && \
+        dockutil --no-restart --add "/System/Applications/Calendar.app"
+
+    # Browser
     [ -d "/Applications/Safari.app" ] && \
         dockutil --no-restart --add "/Applications/Safari.app"
 
@@ -34,21 +44,13 @@ setup_dock() {
     [ -d "/Applications/WezTerm.app" ] && \
         dockutil --no-restart --add "/Applications/WezTerm.app"
 
-    [ -d "/Applications/Docker Desktop.app" ] && \
-        dockutil --no-restart --add "/Applications/Docker Desktop.app"
-
-    [ -d "/Applications/Herd.app" ] && \
-        dockutil --no-restart --add "/Applications/Herd.app"
-
-    # Utilities
-    [ -d "/Applications/Raycast.app" ] && \
-        dockutil --no-restart --add "/Applications/Raycast.app"
-
+    # Entertainment
     [ -d "/Applications/Spotify.app" ] && \
         dockutil --no-restart --add "/Applications/Spotify.app"
 
-    # System apps
-    dockutil --no-restart --add "/System/Applications/System Settings.app"
+    # System
+    [ -d "/System/Applications/System Settings.app" ] && \
+        dockutil --no-restart --add "/System/Applications/System Settings.app"
 
     # Restart Dock to apply changes
     info "Restarting Dock..."
