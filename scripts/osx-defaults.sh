@@ -41,13 +41,22 @@ apply_osx_system_defaults() {
     # Computer & Host Name                                                        #
     ###############################################################################
 
-    info "Setting computer name to: $COMPUTER_NAME..."
+    # Get current computer name
+    CURRENT_NAME=$(scutil --get ComputerName 2>/dev/null || echo "Not set")
 
-    # Set computer name (as done via System Preferences → Sharing)
-    sudo scutil --set ComputerName "$COMPUTER_NAME"
-    sudo scutil --set HostName "$COMPUTER_NAME"
-    sudo scutil --set LocalHostName "$COMPUTER_NAME"
-    sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "$COMPUTER_NAME"
+    info "Current computer name: $CURRENT_NAME"
+    read -p "Set computer name to '$COMPUTER_NAME'? (Skip on work laptops) [y/n] " set_computer_name
+
+    if [[ "$set_computer_name" == "y" ]]; then
+        info "Setting computer name to: $COMPUTER_NAME..."
+        sudo scutil --set ComputerName "$COMPUTER_NAME"
+        sudo scutil --set HostName "$COMPUTER_NAME"
+        sudo scutil --set LocalHostName "$COMPUTER_NAME"
+        sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "$COMPUTER_NAME"
+        success "Computer name set to $COMPUTER_NAME"
+    else
+        info "Skipping computer name change (keeping: $CURRENT_NAME)"
+    fi
 
     ###############################################################################
     # Localization                                                                #
