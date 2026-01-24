@@ -1,440 +1,358 @@
 # Dotfiles
 
-Personal development environment configuration for **macOS and Linux**. These dotfiles help maintain a consistent setup across different machines and make setting up a new computer painless.
+Personal development environment configuration for **macOS and Linux**.
 
-Powered by Homebrew (which works on both macOS and Linux!), these configs are portable across platforms with minimal differences.
-
-## What's Included
-
-### Shell Configuration
-- **Zsh** - Shell configuration with custom aliases and functions
-  - Custom prompt with Starship
-  - Syntax highlighting and autosuggestions
-  - FZF integration for fuzzy finding
-  - Zoxide for smarter directory navigation
-  - Vi mode keybindings
-  - Herd (PHP), Pyenv (Python), NVM (Node) integration
-
-### Editor Configurations
-- **Neovim** - Full IDE setup with LSP, fuzzy finding, git integration
-  - See [nvim/README.md](nvim/README.md) for detailed features
-- **Vim** - Portable, plugin-free config for quick edits
-  - See [vim/README.md](vim/README.md) for features
-
-### Terminal & UI
-- **WezTerm** - Modern, GPU-accelerated terminal emulator
-- **Starship** - Fast, customizable prompt
-- **btop** - System resource monitor
-- **Composer** - PHP dependency manager config
-
-### Scripts & Automation
-- **install.sh** - Main installation script
-- **scripts/prerequisites.sh** - Installs Xcode CLI tools & Homebrew
-- **scripts/brew-install-custom.sh** - Manages Homebrew packages
-- **scripts/osx-defaults.sh** - Applies macOS system preferences
-- **scripts/symlinks.sh** - Creates/removes symlinks
-
-### Application & Tool Installation
-- **Homebrew/Brewfile** - All packages and applications to install
-  - CLI tools (git, neovim, fzf, ripgrep, etc.)
-  - GUI applications (Docker, Raycast, Rectangle, etc.)
-  - Development tools (Herd, Claude Code, etc.)
+**Repository:** [github.com/Rozkalns/dotfiles](https://github.com/Rozkalns/dotfiles)
 
 ## Quick Start
 
-### Fresh macOS Setup
-
 ```bash
-# Clone this repository
-git clone <your-repo-url> ~/dotfiles
-cd ~/dotfiles
+# Clone the repository
+git clone git@github.com:Rozkalns/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
 
-# Run the installation script
+# Install everything
+make
+
+# Or use the interactive installer
 ./install.sh
 ```
 
-The script will ask:
-- **Install apps?** [y/n] - Answer `y` on fresh install to install all Homebrew packages
-- **Overwrite existing dotfiles?** [y/n] - Answer `y` on fresh install to replace existing configs
+## What's Included
 
-### What the Install Script Does
+### 🎨 Theme
+- **Catppuccin Mocha** - Consistent theme across all tools
+- Starship, Neovim, Zsh syntax highlighting, btop, WezTerm
 
-1. **Prerequisites** (if you answer `y` to install apps)
-   - Installs Xcode Command Line Tools
-   - Installs Homebrew package manager
+### 🐚 Shell
+- **Zsh** - Modern shell configuration
+- **Starship** - Fast, beautiful prompt with git info
+- **Modern CLI tools** - bat, eza, fzf, ripgrep, zoxide, fd
+- Syntax highlighting and autosuggestions
+- Custom aliases and functions
 
-2. **Applications** (if you answer `y` to install apps)
-   - Runs `brew bundle` to install all packages from `homebrew/Brewfile`
-   - Installs CLI tools (git, neovim, fzf, etc.)
-   - Installs GUI apps (Docker, Raycast, etc.)
+### ⌨️ Editors
+- **Neovim** - Minimal config with Catppuccin theme
+- **Vim** - Portable fallback config
 
-3. **macOS System Defaults**
-   - Disables key repeat delay (faster key repeats)
-   - Hides desktop icons and drives
-   - Shows hidden files in Finder
-   - Shows path bar and status bar in Finder
-   - Sets Dock to auto-hide
-   - Configures Rectangle window management
-   - And more... (see `scripts/osx-defaults.sh`)
+### 🖥️ Terminal
+- **WezTerm** - GPU-accelerated terminal with Catppuccin
+- Configured keybindings (Cmd+K clear, Option+Arrows word jump)
 
-4. **Terminal Setup**
-   - Creates `~/.hushlogin` to suppress login messages
+### 🍺 Package Management
+- **Homebrew** - Works on macOS and Linux
+- **Separate Brewfile/Caskfile** - CLI tools vs GUI apps
+- Auto-installs: git, neovim, docker, and more
 
-5. **Symlinks**
-   - Creates symbolic links from dotfiles to their proper locations
-   - See `symlinks.conf` for the complete list
+### 🍎 macOS Configuration
+- Comprehensive system defaults (keyboard, trackpad, Finder, Dock)
+- Automated Dock setup (Mail, Messages, Calendar, Safari, PhpStorm, etc.)
+- Default file associations (PHPStorm for code files)
+- Hot corner: Bottom-left locks screen
 
-### Fresh Linux/Ubuntu Setup
+### 🔧 Utilities
+- **bin/** - Helper scripts (is-macos, is-linux, is-executable, etc.)
+- **topgrade** - Update everything with one command
+- **GNU stow** - Symlink management
+- **Makefile** - Task orchestration
 
-```bash
-# Clone this repository
-git clone <your-repo-url> ~/dotfiles
-cd ~/dotfiles
+## Installation
 
-# Run the same installation script!
-./install.sh
-```
-
-**What works on Linux:**
-- ✅ All CLI tools (bat, eza, fd, fzf, ripgrep, neovim, etc.)
-- ✅ Vim and Neovim configs
-- ✅ Zsh configuration with all plugins
-- ✅ Starship prompt
-- ✅ Shell aliases and functions
-
-**What's skipped on Linux:**
-- ⏭️ GUI apps (casks) - Linux doesn't use Homebrew casks
-- ⏭️ macOS system defaults - Linux has different system settings
-
-**Note:** Homebrew works on Linux! The script will:
-1. Install build dependencies (gcc, make, etc.)
-2. Install Homebrew to `/home/linuxbrew/.linuxbrew`
-3. Install all CLI tools from the Brewfile
-4. Skip GUI apps automatically
-5. Symlink all portable configs
-
-## Using on Multiple Machines
-
-### Updating Existing Setup
-
-If you already have these dotfiles set up and want to pull updates:
+### Full Installation (macOS)
 
 ```bash
-cd ~/dotfiles
-git pull
-
-# Only update symlinks, skip app installation
-./install.sh
-# Answer 'n' to "Install apps?"
-# Answer 'n' to "Overwrite existing dotfiles?" (unless you want to replace)
+make              # Install everything
+make macos        # macOS-specific
+make link         # Just create symlinks
+make brew         # Just install packages
+make defaults     # Just apply macOS defaults
 ```
 
-### Work vs Personal Mac
-
-**⚠️ IMPORTANT: Read Before Installing on Work Computer**
-
-These dotfiles are safe to use on work computers **with some considerations**:
-
-#### Safe to Install
-✅ **Editor configs** (vim, nvim) - No security concerns
-✅ **Shell configs** (zsh) - Just productivity improvements
-✅ **Terminal config** (wezterm) - Safe customization
-
-#### Requires Review
-⚠️ **Brewfile** - Contains personal apps you may not want/need at work:
-- `claude-code` - Personal AI tool
-- `spotify` - Music streaming
-- `superwhisper` - Personal transcription app
-- `winbox` - Networking tool
-- Consider editing `homebrew/Brewfile` before running install
-
-⚠️ **OSX Defaults** - Changes system preferences:
-- Shows hidden files (might reveal config files)
-- Modifies Dock and Finder behavior
-- Your work IT might have specific settings
-- Review `scripts/osx-defaults.sh` first
-
-#### Must Customize
-❌ **Git Config** - Likely needs different email/credentials
-- Update `zsh/custom.zsh` or create work-specific config
-- Use different git user.email for work repos
-
-#### Recommended Approach for Work Mac
+### Linux Installation
 
 ```bash
-# 1. Clone the repo
-git clone <your-repo-url> ~/dotfiles
-cd ~/dotfiles
-
-# 2. Edit the Brewfile to remove personal apps
-vim homebrew/Brewfile  # Remove spotify, superwhisper, etc.
-
-# 3. Review OSX defaults
-vim scripts/osx-defaults.sh  # Comment out any changes you don't want
-
-# 4. Run install script
-./install.sh
-# Answer 'y' or 'n' to app installation based on your needs
-# Answer 'y' to overwrite dotfiles
+make              # Auto-detects Linux, skips GUI apps
+make linux        # Explicit Linux install
 ```
 
-Alternatively, you can selectively install:
+### Available Commands
 
 ```bash
-# Just symlink configs without installing apps or changing system settings
-./scripts/symlinks.sh --create
-
-# Or manually symlink specific configs
-ln -s ~/dotfiles/nvim ~/.config/nvim
-ln -s ~/dotfiles/vim/.vimrc ~/.vimrc
-ln -s ~/dotfiles/zsh/.zshrc ~/.zshrc
+make              # Full install (auto-detects OS)
+make link         # Create symlinks only
+make brew         # Install Homebrew packages
+make themes       # Install Catppuccin themes
+make dock         # Setup Dock (macOS)
+make defaults     # Apply macOS defaults
+make update       # Update all packages (topgrade)
+make unlink       # Remove all symlinks
+make test         # Test installation
+make help         # Show all commands
 ```
 
-## File Structure
+## Git Aliases
+
+Your git config includes useful aliases:
+
+```bash
+git st              # status
+git co              # checkout
+git br              # branch
+git ci              # commit
+git amend           # amend last commit
+git undo            # undo last commit (keep changes)
+git unstage         # unstage files
+git publish         # push -u origin HEAD (sets up tracking)
+git cleanup         # delete merged branches
+git l               # pretty log with graph
+git d               # diff
+```
+
+## Structure
 
 ```
 dotfiles/
-├── README.md                      # This file
-├── install.sh                     # Main installation script
-├── symlinks.conf                  # Symlink definitions
+├── Makefile              # Task orchestration
+├── install.sh            # Interactive installer (wrapper for make)
 │
-├── zsh/                          # Zsh configuration
-│   ├── .zshrc                    # Main zsh config
-│   ├── custom.zsh                # Custom functions and settings
-│   ├── aliases.zsh               # Command aliases
-│   └── git-completion.*          # Git completion scripts
+├── runcom/               # Files → ~/
+│   ├── .zshrc
+│   └── .zshenv
 │
-├── nvim/                         # Neovim configuration
-│   ├── README.md                 # Neovim setup guide
-│   ├── init.lua                  # Main config entry point
-│   └── lua/                      # Lua configuration files
-│       ├── core/                 # Core options and keymaps
-│       └── plugins/              # Plugin configurations
+├── config/               # Files → ~/.config/
+│   ├── zsh/              # Shell config
+│   ├── nvim/             # Neovim config
+│   ├── starship/         # Prompt config
+│   ├── wezterm/          # Terminal config
+│   ├── git/              # Git config & ignore
+│   ├── topgrade/         # Update tool config
+│   └── ...
 │
-├── vim/                          # Vim configuration
-│   ├── README.md                 # Vim setup guide
-│   └── .vimrc                    # Portable vim config
+├── vim/                  # Vim config → ~/
+│   └── .vimrc
 │
-├── starship/                     # Starship prompt
-│   └── starship.toml             # Prompt configuration
+├── bin/                  # Utility scripts
+│   ├── is-macos
+│   ├── is-linux
+│   ├── is-executable
+│   └── ...
 │
-├── wezterm/                      # WezTerm terminal
-│   └── wezterm.lua               # Terminal configuration
+├── scripts/              # Installation scripts
+│   ├── prerequisites.sh
+│   ├── brew-install-custom.sh
+│   ├── themes.sh
+│   └── osx-defaults.sh
 │
-├── btop/                         # System monitor
-│   └── themes/                   # btop themes
+├── macos/                # macOS-specific
+│   ├── dock.sh           # Dock automation
+│   └── duti              # File associations
 │
-├── composer/                     # PHP Composer
-│   └── .htaccess                 # Composer config
-│
-├── homebrew/                     # Homebrew packages
-│   └── Brewfile                  # All packages to install
-│
-├── scripts/                      # Installation scripts
-│   ├── utils.sh                  # Helper functions (colors, logging)
-│   ├── prerequisites.sh          # Xcode & Homebrew installer
-│   ├── brew-install-custom.sh    # Homebrew package installer
-│   ├── osx-defaults.sh           # macOS system preferences
-│   └── symlinks.sh               # Symlink manager
-│
-└── docs/                         # Documentation
-    └── ideas/                    # Design drafts
+└── homebrew/             # Package management
+    ├── Brewfile          # CLI tools
+    └── Caskfile          # macOS apps
 ```
+
+## Features
+
+### Automated macOS Setup
+
+**Keyboard & Trackpad:**
+- Blazingly fast key repeat
+- Tap to click
+- Three-finger swipe
+- No smart quotes (better for coding)
+
+**Finder:**
+- Show hidden files & extensions
+- Path bar & status bar visible
+- No .DS_Store on network drives
+- List view by default
+
+**System:**
+- Screenshots → ~/Screenshots
+- No boot sound
+- No window animations (faster!)
+- Battery percentage in menu bar
+- Password required immediately after sleep
+
+**Dock:**
+- Auto-hide
+- Perfect size (48px)
+- Bottom-left corner = Lock screen
+- No bouncing icons
+
+### Cross-Platform Support
+
+**macOS:**
+- Full installation (CLI tools + GUI apps)
+- System defaults applied
+- Dock automation
+- File associations
+
+**Linux:**
+- All CLI tools work
+- Symlinks created
+- Skips GUI apps automatically
+- Homebrew installed to /home/linuxbrew
 
 ## Customization
 
-### Adding New Dotfiles
-
-1. Add your config file to the appropriate directory:
-   ```bash
-   mkdir -p mynewapp
-   cp ~/.config/mynewapp/config.conf mynewapp/
-   ```
-
-2. Add symlink entry to `symlinks.conf`:
-   ```
-   $(pwd)/mynewapp/config.conf:$HOME/.config/mynewapp/config.conf
-   ```
-
-3. Test the symlink:
-   ```bash
-   ./scripts/symlinks.sh --create
-   ```
-
-### Adding New Applications
-
-1. Install the app via Homebrew:
-   ```bash
-   brew install <package>
-   # or
-   brew install --cask <app>
-   ```
-
-2. Add to `homebrew/Brewfile`:
-   ```ruby
-   brew "package-name"
-   # or
-   cask "app-name"
-   ```
-
-3. Regenerate Brewfile from current system (optional):
-   ```bash
-   brew bundle dump --file=homebrew/Brewfile --force
-   ```
-
-### Modifying macOS Defaults
-
-Edit `scripts/osx-defaults.sh` to add or remove system preferences:
+### Add New Package
 
 ```bash
-# Example: Change Dock size
-defaults write com.apple.dock tilesize -float 48
+# Install it
+brew install package-name
+
+# Add to Brewfile
+echo 'brew "package-name"' >> homebrew/Brewfile
+
+# Or for GUI apps (macOS)
+echo 'cask "app-name"' >> homebrew/Caskfile
 ```
 
-Find more defaults to customize:
+### Modify macOS Defaults
+
+Edit `scripts/osx-defaults.sh` to add/remove preferences.
+
+Find settings to customize:
 - [macos-defaults.com](https://macos-defaults.com/)
 - Run `defaults read` to see current settings
-- Change a setting in System Preferences, then run `defaults read > before.txt`, change it back, run `defaults read > after.txt`, and `diff` them
+
+### Add New Config
+
+1. Add to appropriate directory:
+   ```bash
+   mkdir -p config/myapp
+   cp ~/.config/myapp/config myapp/
+   ```
+
+2. Run stow to symlink:
+   ```bash
+   make link
+   ```
 
 ## Maintenance
 
-### Updating Brewfile
-
-To capture your current Homebrew installations:
+### Update Everything
 
 ```bash
-cd ~/dotfiles
+make update       # Updates brew, casks, npm, cargo, etc.
+# Or
+topgrade          # Same thing
+```
+
+### Update Brewfile
+
+```bash
 brew bundle dump --file=homebrew/Brewfile --force
 ```
 
-### Removing Symlinks
-
-To remove all symlinks (but keep the actual config files):
+### Remove Symlinks
 
 ```bash
-./scripts/symlinks.sh --delete
+make unlink       # Cleanly removes all symlinks
 ```
 
-To also delete the actual config files (be careful!):
+## Work Computer Setup
+
+### Important Notes
+
+**Safe to use:**
+- ✅ Editor configs (vim, nvim)
+- ✅ Shell configs (zsh, aliases)
+- ✅ Terminal (wezterm)
+
+**Review before using:**
+- ⚠️ Brewfile - Contains personal apps (Spotify, etc.)
+- ⚠️ macOS defaults - Changes system preferences
+- ⚠️ Computer name prompt - Say "n" to keep company name
+
+### Recommended Approach
 
 ```bash
-./scripts/symlinks.sh --delete --include-files
+git clone git@github.com:Rozkalns/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
+
+# Review and edit packages
+vim homebrew/Brewfile    # Remove personal apps
+vim homebrew/Caskfile    # Remove personal GUI apps
+
+# Install
+make
+
+# When prompted for computer name, say 'n'
 ```
 
-### Backing Up Before Changes
+## Migration from v1.0
 
-Always back up before making major changes:
+If you're upgrading from the old dotfiles (custom symlinks.sh):
+
+1. **Remove old symlinks:**
+   ```bash
+   make unlink
+   ```
+
+2. **Create new symlinks:**
+   ```bash
+   make link
+   ```
+
+3. **Reload shell:**
+   ```bash
+   source ~/.zshrc
+   ```
+
+See [docs/MIGRATION.md](docs/MIGRATION.md) for detailed migration guide.
+
+## Testing
 
 ```bash
-# Backup entire config directory
-cp -r ~/.config ~/.config.backup
-
-# Backup specific configs
-cp ~/.zshrc ~/.zshrc.backup
-cp -r ~/.config/nvim ~/.config/nvim.backup
+make test         # Verify installation
 ```
 
-## Key Tools & Technologies
-
-### Command Line Tools
-- **Homebrew** - Package manager for macOS
-- **Zsh** - Modern shell (macOS default)
-- **Starship** - Cross-shell prompt
-- **FZF** - Fuzzy finder for files and commands
-- **Ripgrep** - Fast recursive search
-- **Zoxide** - Smarter cd command
-- **Git** - Version control
-- **Neovim** - Modern Vim-based editor
-
-### Development Tools
-- **Herd** - PHP development environment
-- **Pyenv** - Python version manager
-- **NVM** - Node.js version manager
-- **Docker Desktop** - Container platform
-- **Git Delta** - Better git diffs
-
-### GUI Applications
-- **WezTerm** - GPU-accelerated terminal
-- **Raycast** - Spotlight replacement
-- **Rectangle** - Window management
-- **Hiddenbar** - Hide menu bar items
-- **Claude Code** - AI coding assistant
+Checks:
+- Symlinks created correctly
+- Bin utilities in PATH
+- Configs accessible
 
 ## Troubleshooting
 
 ### Symlinks not working
 
 ```bash
-# Check if symlink exists
-ls -la ~/.zshrc
-
-# Remove broken symlink
-rm ~/.zshrc
-
-# Recreate symlinks
-cd ~/dotfiles
-./scripts/symlinks.sh --create
+ls -la ~/.zshrc           # Check if symlink exists
+make unlink && make link  # Recreate symlinks
 ```
 
-### Homebrew installation fails
+### Bin utilities not in PATH
 
 ```bash
-# Update Homebrew
-brew update
-
-# Check for issues
-brew doctor
-
-# Reinstall specific package
-brew reinstall <package>
+source ~/.zshrc           # Reload shell
+which is-macos            # Should show path
 ```
 
-### Shell config not loading
+### Brew installation fails
 
 ```bash
-# Check for syntax errors
-zsh -n ~/.zshrc
-
-# Source config manually
-source ~/.zshrc
-
-# Check what's being loaded
-zsh -x ~/.zshrc 2>&1 | less
+brew doctor               # Check for issues
+brew update               # Update Homebrew
 ```
 
-### Neovim plugins not installing
+## Tech Stack
 
-```bash
-# Open Neovim
-nvim
-
-# Install plugins
-:Lazy sync
-
-# Check for errors
-:Lazy health
-:checkhealth
-```
-
-## Philosophy
-
-These dotfiles follow these principles:
-
-1. **Portable** - Work on any Mac with minimal dependencies
-2. **Modular** - Each tool's config is independent
-3. **Documented** - READMEs explain what each config does
-4. **Safe** - Backs up before making changes, easy to revert
-5. **Automated** - One command to set up everything
-6. **Transparent** - Scripts are readable and well-commented
+- **Shell:** Zsh with Starship prompt
+- **Package Manager:** Homebrew (macOS & Linux)
+- **Symlinks:** GNU stow
+- **Orchestration:** Makefile
+- **Theme:** Catppuccin Mocha
+- **Terminal:** WezTerm
+- **Editor:** Neovim + Vim
+- **CLI Tools:** bat, eza, fzf, ripgrep, fd, zoxide, git-delta
 
 ## Credits
 
-Inspired by various dotfiles repositories and customized for personal workflow. The Neovim configuration is based on modern Lua practices and the vim config provides a solid fallback.
+Inspired by [webpro/dotfiles](https://github.com/webpro/dotfiles) and modern dotfiles best practices.
 
 ## License
 
-These are personal configurations, but feel free to use and adapt them for your own needs. No warranty provided - use at your own risk!
-
-## Contributing
-
-This is a personal configuration, but if you find bugs or have suggestions, feel free to open an issue or submit a pull request.
+Personal configurations. Feel free to use and adapt. No warranty provided.

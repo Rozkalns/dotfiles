@@ -75,6 +75,7 @@
 	unstage = reset HEAD --
 	last = log -1 HEAD
 	contributors = shortlog --summary --numbered
+	publish = push -u origin HEAD
 
 	# Clean up merged branches
 	cleanup = "!git branch --merged | grep -v '\\*\\|main\\|master' | xargs -n 1 git branch -d"
