@@ -1,0 +1,55 @@
+# File & search tools
+brew "bat"
+brew "eza"
+brew "fd"
+brew "fzf"
+brew "ripgrep"
+
+# Git tools
+brew "git"
+brew "git-delta"
+brew "git-machete"
+brew "gitingest"
+brew "tig"
+
+# System monitoring
+brew "btop"
+
+# Development tools
+# brew "composer"  # Not needed - bundled with Herd
+brew "curl"
+brew "jq"
+brew "jrnl"
+brew "mailpit", restart_service: :changed
+brew "neovim"
+brew "terminal-notifier"
+brew "xz"
+
+# Python
+brew "pyenv"
+
+# Shell enhancements
+brew "starship"
+brew "thefuck"
+brew "zoxide"
+brew "zsh-autosuggestions"
+brew "zsh-syntax-highlighting"
+
+# Terminals
+cask "claude-code"
+cask "wezterm"
+
+# Development
+cask "db-browser-for-sqlite"
+cask "docker-desktop"
+cask "herd"
+
+# Utilities
+cask "hiddenbar"
+cask "openvpn-connect"
+cask "raycast"
+cask "rectangle"
+cask "shottr"
+cask "spotify"
+# cask "superwhisper"  # Temporarily disabled - slow download
+cask "winbox"
