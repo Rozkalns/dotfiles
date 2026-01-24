@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# Custom MOTD script for Ubuntu/Debian servers
+# Displays available updates and reboot requirements
+# Install to: /etc/update-motd.d/99-custom-update-reminder
+#
+
+# Colors
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Check for available updates
+if command -v apt-get >/dev/null 2>&1; then
+    # Count available updates
+    UPDATE_COUNT=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo "0")
+
+    if [ "$UPDATE_COUNT" -gt 0 ]; then
+        echo ""
+        echo -e "${YELLOW}╔═══════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${YELLOW}║${NC}  📦 ${YELLOW}$UPDATE_COUNT package update(s) available${NC}"
+        echo -e "${YELLOW}║${NC}"
+
+        # Check if topgrade is installed
+        if command -v topgrade >/dev/null 2>&1; then
+            echo -e "${YELLOW}║${NC}  ${GREEN}Run:${NC} topgrade"
+        else
+            echo -e "${YELLOW}║${NC}  ${GREEN}Run:${NC} sudo apt update && sudo apt upgrade"
+        fi
+
+        echo -e "${YELLOW}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    fi
+fi
+
+# Check if reboot is required
+if [ -f /var/run/reboot-required ]; then
+    echo ""
+    echo -e "${RED}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║${NC}  🔴 ${RED}REBOOT REQUIRED${NC}"
+    echo -e "${RED}║${NC}"
+    echo -e "${RED}║${NC}  ${GREEN}Run:${NC} sudo reboot"
+
+    # Show which packages require reboot (if file exists)
+    if [ -f /var/run/reboot-required.pkgs ]; then
+        REBOOT_PKGS=$(cat /var/run/reboot-required.pkgs | head -3 | tr '\n' ', ' | sed 's/,$//')
+        echo -e "${RED}║${NC}  ${BLUE}Reason:${NC} $REBOOT_PKGS"
+    fi
+
+    echo -e "${RED}╚═══════════════════════════════════════════════════════════════╝${NC}"
+fi
+
+# Show uptime
+UPTIME=$(uptime -p | sed 's/up //')
+echo ""
+echo -e "${BLUE}Uptime:${NC} $UPTIME"

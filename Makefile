@@ -1,4 +1,4 @@
-.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent help test
+.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent motd help test
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -20,7 +20,7 @@ macos: core link brew themes dock defaults phpstorm topgrade-agent
 	@echo ""
 
 # Linux installation
-linux: core link
+linux: core link motd
 	@echo "✅ Linux dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -32,7 +32,8 @@ core:
 	@echo "==> Setting up core..."
 	@chmod +x bin/*
 	@chmod +x scripts/*.sh
-	@chmod +x macos/*.sh
+	@chmod +x macos/*.sh 2>/dev/null || true
+	@chmod +x linux/*.sh 2>/dev/null || true
 
 # Create symlinks using stow
 link:
@@ -95,6 +96,15 @@ else
 	@echo "Skipping Topgrade LaunchAgent (not macOS)"
 endif
 
+# Setup MOTD (Linux)
+motd:
+ifeq ($(OS),linux)
+	@echo "==> Setting up MOTD..."
+	@./linux/motd.sh
+else
+	@echo "Skipping MOTD setup (not Linux)"
+endif
+
 # Update everything
 update:
 	@echo "==> Updating all packages..."
@@ -135,6 +145,7 @@ help:
 	@echo "  make defaults     Apply macOS defaults only"
 	@echo "  make phpstorm     Configure PhpStorm fonts (macOS)"
 	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
+	@echo "  make motd         Install MOTD update reminder (Linux)"
 	@echo "  make update       Update all packages (uses topgrade)"
 	@echo "  make unlink       Remove all symlinks"
 	@echo "  make test         Test installation"
