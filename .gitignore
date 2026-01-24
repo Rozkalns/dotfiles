@@ -3,3 +3,6 @@
 __pycache__
 system/.custom
 system/.exports
+
+# Composer global packages (managed by Herd/system, not dotfiles)
+config/composer/

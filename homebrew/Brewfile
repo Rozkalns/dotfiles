@@ -41,6 +41,9 @@ brew "zoxide"
 brew "zsh-autosuggestions"
 brew "zsh-syntax-highlighting"
 
+# Fonts (for Starship and terminal)
+cask "font-jetbrains-mono-nerd-font"
+
 # macOS-specific tools (auto-skipped on Linux)
 brew "dockutil" if OS.mac?
 brew "duti" if OS.mac?
