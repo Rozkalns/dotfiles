@@ -1,126 +1,73 @@
 #!/bin/bash
 
+# Dotfiles Installation Script
+# This is a wrapper around the Makefile for backward compatibility
+
+set -e
+
 # Get the absolute path of the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Add bin to PATH for utility scripts
 export PATH="$SCRIPT_DIR/bin:$PATH"
 
-. $SCRIPT_DIR/scripts/utils.sh
-. $SCRIPT_DIR/scripts/prerequisites.sh
-. $SCRIPT_DIR/scripts/brew-install-custom.sh
-. $SCRIPT_DIR/scripts/themes.sh
-. $SCRIPT_DIR/scripts/osx-defaults.sh
-. $SCRIPT_DIR/scripts/symlinks.sh
-. $SCRIPT_DIR/macos/dock.sh
+# Source utils for colored output
+. "$SCRIPT_DIR/scripts/utils.sh"
 
-info "Dotfiles installation initialized..."
-read -p "Install apps? [y/n] " install_apps
-read -p "Overwrite existing dotfiles? [y/n] " overwrite_dotfiles
+echo ""
+info "========================================"
+info "   Dotfiles Installation (v2.0)"
+info "========================================"
+echo ""
+info "This installation uses GNU stow + Makefile"
+info "See 'make help' for all available commands"
+echo ""
 
+# Check if stow is installed
+if ! command -v stow >/dev/null 2>&1; then
+    warning "GNU stow is not installed yet"
+    info "It will be installed via Homebrew during setup"
+    echo ""
+fi
+
+# Interactive prompts
+read -p "Install/update apps via Homebrew? [y/n] " install_apps
+read -p "Create/update symlinks? [y/n] " create_symlinks
+
+echo ""
+
+# Build make command based on user choices
 if [[ "$install_apps" == "y" ]]; then
-    printf "\n"
-    info "===================="
-    info "Prerequisites"
-    info "===================="
+    info "Running full installation..."
+    make all
+elif [[ "$create_symlinks" == "y" ]]; then
+    info "Creating symlinks only..."
+    make core link
 
-    # macOS-specific prerequisites
+    # Optionally run macOS defaults
     if is-macos; then
-        install_xcode
-    fi
-
-    install_homebrew
-
-    printf "\n"
-    info "===================="
-    info "Apps"
-    info "===================="
-
-    run_brew_bundle
-
-    printf "\n"
-    info "===================="
-    info "Themes"
-    info "===================="
-
-    install_catppuccin_themes
-
-    # macOS-specific setup that requires installed apps
-    if is-macos; then
-        printf "\n"
-        info "===================="
-        info "Dock Setup"
-        info "===================="
-
-        if is-executable dockutil; then
-            read -p "Configure Dock with preferred apps? [y/n] " configure_dock
-            if [[ "$configure_dock" == "y" ]]; then
-                setup_dock
-            fi
-        else
-            warning "dockutil not installed - skipping Dock setup"
-            info "Install with: brew install dockutil"
-        fi
-
-        printf "\n"
-        info "===================="
-        info "Default Applications"
-        info "===================="
-
-        if is-executable duti; then
-            read -p "Set default applications (PHPStorm for code files)? [y/n] " set_defaults
-            if [[ "$set_defaults" == "y" ]]; then
-                info "Setting default applications..."
-                duti "$SCRIPT_DIR/macos/duti"
-                success "Default applications configured!"
-            fi
-        else
-            warning "duti not installed - skipping default application setup"
-            info "Install with: brew install duti"
+        read -p "Apply macOS system defaults? [y/n] " apply_defaults
+        if [[ "$apply_defaults" == "y" ]]; then
+            make defaults
         fi
     fi
+else
+    warning "No actions selected. Exiting."
+    echo ""
+    info "Run 'make help' to see all available commands"
+    exit 0
 fi
 
-# macOS system defaults (can run even without installing apps)
-if is-macos; then
-    printf "\n"
-    info "===================="
-    info "macOS System Defaults"
-    info "===================="
-
-    register_keyboard_shortcuts
-    apply_osx_system_defaults
-fi
-
-printf "\n"
-info "===================="
-info "Terminal"
-info "===================="
-
-info "Adding .hushlogin file to suppress 'last login' message in terminal..."
-touch ~/.hushlogin
-
-printf "\n"
-info "===================="
-info "Symbolic Links"
-info "===================="
-
-chmod +x $SCRIPT_DIR/scripts/symlinks.sh
-if [[ "$overwrite_dotfiles" == "y" ]]; then
-    warning "Deleting existing dotfiles..."
-    $SCRIPT_DIR/scripts/symlinks.sh --delete --include-files
-fi
-$SCRIPT_DIR/scripts/symlinks.sh --create
-
-printf "\n"
-success "Dotfiles set up successfully."
-printf "\n"
-info "To activate your new shell configuration, run:"
-info "    source ~/.zshrc"
-info "Or open a new terminal window/tab."
-printf "\n"
-read -p "Reload shell now? [y/n] " reload_shell
-if [[ "$reload_shell" == "y" ]]; then
-    info "Reloading shell..."
-    exec $SHELL
-fi
+echo ""
+success "Installation complete!"
+echo ""
+info "Next steps:"
+info "  1. Reload shell: source ~/.zshrc"
+info "  2. Or open a new terminal window"
+echo ""
+info "Useful commands:"
+info "  make update    - Update all packages"
+info "  make unlink    - Remove all symlinks"
+info "  make test      - Test installation"
+info "  make help      - Show all commands"
+echo ""
