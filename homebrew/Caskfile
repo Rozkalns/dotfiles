@@ -9,6 +9,7 @@ cask "wezterm"
 cask "db-browser-for-sqlite"
 cask "docker-desktop"
 cask "herd"
+cask "phpstorm"
 
 # Utilities
 cask "hiddenbar"

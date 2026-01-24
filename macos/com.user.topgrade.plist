@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.user.topgrade</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/bin/bash</string>
+      <string>-c</string>
+      <string>
+        export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+
+        if command -v terminal-notifier &amp;> /dev/null; then
+          terminal-notifier -title "Topgrade Update" \
+            -message "System update started"
+        fi
+
+        {
+          echo "===== Topgrade Started: $(date) =====";
+          topgrade --yes --config "$HOME/.config/topgrade/topgrade.toml" || {
+            echo "First attempt failed. Retrying in 30 seconds..."
+            sleep 30
+            topgrade --yes --config "$HOME/.config/topgrade/topgrade.toml"
+          }
+          echo "===== Topgrade Completed: $(date) =====";
+        } 2>&amp;1
+
+        if command -v terminal-notifier &amp;> /dev/null; then
+          terminal-notifier -title "Topgrade Update" \
+            -message "System update finished. Click to view logs" \
+            -open "file://$HOME/topgrade_stdout.log"
+        fi
+      </string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>3</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>Nice</key>
+    <integer>1</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/roberts/topgrade_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/roberts/topgrade_stderr.log</string>
+  </dict>
+</plist>

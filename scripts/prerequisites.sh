@@ -50,7 +50,37 @@ install_homebrew() {
     fi
 }
 
+install_topgrade_linux() {
+    # Fallback: Install topgrade binary directly on Linux if brew not available
+    # (topgrade is in Brewfile, so this is only needed for minimal server installs)
+    if is-executable topgrade; then
+        warning "topgrade already installed"
+        return
+    fi
+
+    if ! is-executable brew && is-linux; then
+        info "Installing topgrade directly (brew not available)..."
+
+        # Detect architecture
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "x86_64" ]; then
+            TOPGRADE_URL="https://github.com/topgrade-rs/topgrade/releases/latest/download/topgrade-v0.16.0-x86_64-unknown-linux-musl.tar.gz"
+        elif [ "$ARCH" = "aarch64" ]; then
+            TOPGRADE_URL="https://github.com/topgrade-rs/topgrade/releases/latest/download/topgrade-v0.16.0-aarch64-unknown-linux-musl.tar.gz"
+        else
+            warning "Unsupported architecture: $ARCH"
+            return
+        fi
+
+        curl -sSL "$TOPGRADE_URL" | tar xz
+        sudo mv topgrade /usr/local/bin/
+        sudo chmod +x /usr/local/bin/topgrade
+        info "topgrade installed to /usr/local/bin/topgrade"
+    fi
+}
+
 if [ "$(basename "$0")" = "$(basename "${BASH_SOURCE[0]}")" ]; then
     install_xcode
     install_homebrew
+    install_topgrade_linux
 fi

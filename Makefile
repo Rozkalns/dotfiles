@@ -1,4 +1,4 @@
-.PHONY: all macos linux link core brew themes dock defaults phpstorm help test
+.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent help test
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -12,7 +12,7 @@ endif
 all: $(OS)
 
 # macOS installation
-macos: core link brew themes dock defaults phpstorm
+macos: core link brew themes dock defaults phpstorm topgrade-agent
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -86,6 +86,15 @@ else
 	@echo "Skipping PhpStorm configuration (not macOS)"
 endif
 
+# Setup Topgrade LaunchAgent
+topgrade-agent:
+ifeq ($(OS),macos)
+	@echo "==> Setting up Topgrade LaunchAgent..."
+	@./macos/topgrade-launchagent.sh
+else
+	@echo "Skipping Topgrade LaunchAgent (not macOS)"
+endif
+
 # Update everything
 update:
 	@echo "==> Updating all packages..."
@@ -125,6 +134,7 @@ help:
 	@echo "  make dock         Setup Dock only (macOS)"
 	@echo "  make defaults     Apply macOS defaults only"
 	@echo "  make phpstorm     Configure PhpStorm fonts (macOS)"
+	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
 	@echo "  make update       Update all packages (uses topgrade)"
 	@echo "  make unlink       Remove all symlinks"
 	@echo "  make test         Test installation"

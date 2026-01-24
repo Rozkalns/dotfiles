@@ -23,8 +23,12 @@ cleanup = true
 # "npm" = "npm update --location global --force"
 
 [brew]
-# Automatically upgrade outdated casks
-# greedy = true
+# Automatically upgrade outdated casks (even those with auto-update like PhpStorm, Rectangle, Raycast)
+# Uses --greedy flag (or -a with brew-cask-upgrade)
+greedy_cask = true
+
+# Clean up old versions after upgrade
+autoremove = true
 
 [composer]
 # Update global composer packages
