@@ -3,19 +3,13 @@
 # PhpStorm Configuration Script
 # Sets up JetBrains Mono Nerd Font for editor and terminal
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-info() { echo -e "${GREEN}==>${NC} $1"; }
-warn() { echo -e "${YELLOW}Warning:${NC} $1"; }
-error() { echo -e "${RED}Error:${NC} $1"; }
+# Source utils.sh
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$_SCRIPT_DIR/../scripts/utils.sh"
 
 # Check if PhpStorm is installed
 if [ ! -d "/Applications/PhpStorm.app" ]; then
-    warn "PhpStorm not found at /Applications/PhpStorm.app"
+    warning "PhpStorm not found at /Applications/PhpStorm.app"
     echo "Skipping PhpStorm configuration"
     exit 0
 fi
@@ -26,7 +20,7 @@ info "Configuring PhpStorm..."
 PHPSTORM_CONFIG_BASE="$HOME/Library/Application Support/JetBrains"
 
 if [ ! -d "$PHPSTORM_CONFIG_BASE" ]; then
-    warn "PhpStorm config directory not found at $PHPSTORM_CONFIG_BASE"
+    warning "PhpStorm config directory not found at $PHPSTORM_CONFIG_BASE"
     echo "Please run PhpStorm at least once before running this script"
     exit 0
 fi
@@ -35,7 +29,7 @@ fi
 PHPSTORM_DIR=$(find "$PHPSTORM_CONFIG_BASE" -maxdepth 1 -type d -name "PhpStorm*" | sort -V | tail -1)
 
 if [ -z "$PHPSTORM_DIR" ]; then
-    warn "No PhpStorm configuration directory found"
+    warning "No PhpStorm configuration directory found"
     echo "Please run PhpStorm at least once before running this script"
     exit 0
 fi

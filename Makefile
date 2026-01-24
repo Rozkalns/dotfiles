@@ -1,4 +1,4 @@
-.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent motd help test
+.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent motd git-setup help test
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -105,6 +105,11 @@ else
 	@echo "Skipping MOTD setup (not Linux)"
 endif
 
+# Setup Git configuration
+git-setup:
+	@echo "==> Setting up Git configuration..."
+	@./scripts/git-setup.sh
+
 # Update everything
 update:
 	@echo "==> Updating all packages..."
@@ -146,6 +151,7 @@ help:
 	@echo "  make phpstorm     Configure PhpStorm fonts (macOS)"
 	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
 	@echo "  make motd         Install MOTD update reminder (Linux)"
+	@echo "  make git-setup    Setup Git user configuration"
 	@echo "  make update       Update all packages (uses topgrade)"
 	@echo "  make unlink       Remove all symlinks"
 	@echo "  make test         Test installation"

@@ -3,15 +3,9 @@
 # Topgrade LaunchAgent Setup
 # Installs a LaunchAgent to run topgrade daily at 3am
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-info() { echo -e "${GREEN}==>${NC} $1"; }
-warn() { echo -e "${YELLOW}Warning:${NC} $1"; }
-error() { echo -e "${RED}Error:${NC} $1"; }
+# Source utils.sh
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$_SCRIPT_DIR/../scripts/utils.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLIST_SOURCE="$SCRIPT_DIR/com.user.topgrade.plist"
@@ -21,7 +15,7 @@ info "Setting up Topgrade LaunchAgent..."
 
 # Check if topgrade is installed
 if ! command -v topgrade &>/dev/null; then
-    warn "topgrade not installed. Install it with: brew install topgrade"
+    warning "topgrade not installed. Install it with: brew install topgrade"
     echo "Skipping LaunchAgent setup"
     exit 0
 fi

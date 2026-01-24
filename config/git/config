@@ -32,12 +32,16 @@
 
 [rebase]
 	autoStash = true
+	instructionFormat = (%aN <%aE> @ %ar) %s
 
 [grep]
 	lineNumber = true
 
-[help]
-	autocorrect = 1
+[status]
+	submodulesummary = 1
+
+[submodule]
+	recurse = true
 
 [diff]
 	renames = copies
@@ -48,11 +52,17 @@
 	conflictstyle = diff3
 	defaultToUpstream = true
 
+[interactive]
+	diffFilter = delta --color-only --features=interactive
+
 [delta]
 	navigate = true
 	light = false
 	line-numbers = true
 	side-by-side = true
+
+[delta "interactive"]
+	keep-plus-minus-markers = false
 
 [alias]
 	# Shortcuts
@@ -72,10 +82,24 @@
 
 	# Useful commands
 	undo = reset --soft HEAD^
+	redo = reset --hard HEAD@{1}
 	unstage = reset HEAD --
 	last = log -1 HEAD
 	contributors = shortlog --summary --numbered
 	publish = push -u origin HEAD
+
+	# Quick workflow
+	save = "!git add -A && git commit -m 'SAVEPOINT'"
+	wip = commit -am "WIP"
+
+	# Safe force push (checks remote state first)
+	pfl = "!f() { git push --force-with-lease=$(git rev-parse --abbrev-ref HEAD):${1:-@{u}}; }; f"
+
+	# Find who to ask for PR review (shows authors of changed files)
+	reviewers = "!git diff --name-only $(git merge-base --fork-point ${1:-main}).. | xargs -n 1 git blame -w -M --porcelain | grep '^author ' | sort | uniq -c | sort -nr | head -10"
+
+	# Fuzzy branch switching (requires fzf)
+	fsw = "!git branch -a | fzf | xargs git switch"
 
 	# Clean up merged branches
 	cleanup = "!git branch --merged | grep -v '\\*\\|main\\|master' | xargs -n 1 git branch -d"
