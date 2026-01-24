@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Check if running on macOS
-[[ "$OSTYPE" == "darwin"* ]]
+if [[ "$OSTYPE" =~ ^darwin ]]; then
+  exit 0
+else
+  exit 1
+fi

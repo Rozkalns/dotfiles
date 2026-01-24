@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Check if running on Linux
-[[ "$OSTYPE" == "linux-gnu"* ]]
+if [[ "$OSTYPE" =~ ^linux ]]; then
+  exit 0
+else
+  exit 1
+fi
