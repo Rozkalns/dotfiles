@@ -351,7 +351,14 @@ brew update               # Update Homebrew
 
 ## Credits
 
-Inspired by [webpro/dotfiles](https://github.com/webpro/dotfiles) and modern dotfiles best practices.
+Heavily inspired by [webpro/dotfiles](https://github.com/webpro/dotfiles) - particularly the Makefile orchestration, GNU stow usage, and bin utilities approach.
+
+### Resources
+
+- [webpro/dotfiles](https://github.com/webpro/dotfiles) - Excellent dotfiles implementation
+- [webpro/awesome-dotfiles](https://github.com/webpro/awesome-dotfiles) - Curated list of dotfiles resources
+- [Getting Started with Dotfiles](https://webpro.nl/articles/getting-started-with-dotfiles) - Great intro article by webpro
+- [Catppuccin](https://github.com/catppuccin) - Beautiful pastel theme used throughout
 
 ## License
 
