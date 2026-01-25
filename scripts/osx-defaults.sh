@@ -13,7 +13,7 @@ export PATH="$_DOTFILES_DIR/bin:$PATH"
 SCREENSHOTS_FOLDER="${HOME}/Screenshots"
 COMPUTER_NAME="Hatchet"
 LANGUAGES=(en lv)
-LOCALE="en_US@currency=EUR"
+LOCALE="en_LV"  # English (Latvia) - uses Monday as first day, EUR currency
 MEASUREMENT_UNITS="Centimeters"
 
 register_keyboard_shortcuts() {
@@ -26,7 +26,15 @@ register_keyboard_shortcuts() {
     # Disable Show Finder search window (key code 65)
     defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 65 "<dict><key>enabled</key><false/></dict>"
 
-    success "Spotlight shortcuts disabled. Raycast can now use Cmd+Space"
+    # Configure Raycast to use Cmd+Space
+    if [ -d "/Applications/Raycast.app" ]; then
+        info "Configuring Raycast to use Cmd+Space..."
+        # Set Raycast hotkey to Cmd+Space (key code 49, modifier 1048576 = Cmd)
+        defaults write com.raycast.macos raycastGlobalHotkey -string "Command-49"
+        success "Raycast configured to use Cmd+Space"
+    fi
+
+    success "Keyboard shortcuts configured"
     info "Note: You may need to restart or log out for changes to take effect"
 }
 
@@ -69,6 +77,9 @@ apply_osx_system_defaults() {
     defaults write NSGlobalDomain AppleLocale -string "$LOCALE"
     defaults write NSGlobalDomain AppleMeasurementUnits -string "$MEASUREMENT_UNITS"
     defaults write NSGlobalDomain AppleMetricUnits -bool true
+
+    # Use 24-hour time format
+    defaults write NSGlobalDomain AppleICUForce24HourTime -bool true
 
     # Set the time zone automatically
     sudo defaults write /Library/Preferences/com.apple.timezone.auto Active -bool YES
