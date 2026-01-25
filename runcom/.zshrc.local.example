@@ -1,0 +1,18 @@
+# Local machine-specific configuration (example)
+# Copy this to ~/.zshrc.local (not tracked in git)
+# This file is sourced by .zshrc and is safe for tools like Herd to modify
+
+# Example: Work-specific environment variables
+# export WORK_PROJECT_PATH="$HOME/work/projects"
+
+# Example: API keys and secrets (NEVER commit these!)
+# export OPENAI_API_KEY="sk-..."
+
+# Example: Machine-specific PATH additions
+# export PATH="/opt/custom/bin:$PATH"
+
+# Herd will inject its configuration here automatically when installed:
+# - PHP configuration paths
+# - NVM integration
+# - Herd shell integration
+# - PHP binary paths

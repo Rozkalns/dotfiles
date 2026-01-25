@@ -23,18 +23,6 @@ export BAT_PAGER="less -RFX"
 # -X: don't clear screen on exit
 # Note: Removed --mouse flag as it causes escape sequences to leak
 
-# Herd
-export HERD_PHP_84_INI_SCAN_DIR="/Users/roberts/Library/Application Support/Herd/config/php/84/"
-
-# Herd injected NVM configuration
-export NVM_DIR="/Users/roberts/Library/Application Support/Herd/config/nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-
-[[ -f "/Applications/Herd.app/Contents/Resources/config/shell/zshrc.zsh" ]] && builtin source "/Applications/Herd.app/Contents/Resources/config/shell/zshrc.zsh"
-
-# Herd injected PHP binary.
-export PATH="/Users/roberts/Library/Application Support/Herd/bin/":$PATH
-
 # Pipenv
 export PIPENV_VENV_IN_PROJECT=1
 

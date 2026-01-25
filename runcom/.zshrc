@@ -7,6 +7,5 @@ setopt HIST_IGNORE_ALL_DUPS
 # Aliases
 [ -f "$HOME/.config/zsh/aliases.zsh" ] && source "$HOME/.config/zsh/aliases.zsh"
 
-
-# Herd injected PHP 8.4 configuration.
-export HERD_PHP_84_INI_SCAN_DIR="/Users/roberts/Library/Application Support/Herd/config/php/84/"
+# Local machine-specific config (gitignored - for Herd, work-specific stuff, etc.)
+[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
