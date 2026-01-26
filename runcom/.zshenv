@@ -11,6 +11,7 @@ export XDG_STATE_HOME="$HOME/.local/state"     # Logs and state files
 export NVIM_THEME="catppuccin" # catppuccin_mocha
 export STARSHIP_THEME="catppuccin_mocha"
 export WEZTERM_THEME="Catppuccin Mocha"
+export EZA_CONFIG_DIR="$HOME/.config/eza"
 
 # Use Neovim as default editor
 export EDITOR="nvim"
