@@ -56,6 +56,21 @@ if command -v nvim &> /dev/null; then
     alias v='nvim'
 fi
 
+if command -v fzf &> /dev/null; then
+    # fcd - fuzzy cd to selected directory
+    fcd() {
+        local dir
+        dir=$(find ${1:-.} -path '*/\.*' -prune \
+                        -o -type d -print 2> /dev/null | fzf +m) &&
+        cd "$dir"
+    }
+
+    # fh - search in your command history and execute selected command
+    fh() {
+        eval $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) | fzf +s --tac | sed 's/ *[0-9]* *//')
+    }
+fi
+
 # Git aliases
 alias g='git'
 alias gs='git status'

@@ -7,5 +7,8 @@ setopt HIST_IGNORE_ALL_DUPS
 # Aliases
 [ -f "$HOME/.config/zsh/aliases.zsh" ] && source "$HOME/.config/zsh/aliases.zsh"
 
+# ZLE plugins (autosuggestions, syntax highlighting) - MUST be loaded last
+[ -f "$HOME/.config/zsh/plugins.zsh" ] && source "$HOME/.config/zsh/plugins.zsh"
+
 # Local machine-specific config (gitignored - for Herd, work-specific stuff, etc.)
 [ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
