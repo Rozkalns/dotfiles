@@ -12,7 +12,7 @@ endif
 all: $(OS)
 
 # macOS installation
-macos: core link brew themes dock defaults phpstorm topgrade-agent
+macos: core brew link themes dock defaults phpstorm topgrade-agent
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -20,7 +20,7 @@ macos: core link brew themes dock defaults phpstorm topgrade-agent
 	@echo ""
 
 # Linux installation
-linux: core link motd
+linux: core brew link motd
 	@echo "✅ Linux dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
