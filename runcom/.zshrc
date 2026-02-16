@@ -1,14 +1,11 @@
 # zsh Options
 setopt HIST_IGNORE_ALL_DUPS
 
-# Custom zsh
-[ -f "$HOME/.config/zsh/custom.zsh" ] && source "$HOME/.config/zsh/custom.zsh"
-
-# Aliases
-[ -f "$HOME/.config/zsh/aliases.zsh" ] && source "$HOME/.config/zsh/aliases.zsh"
-
-# ZLE plugins (autosuggestions, syntax highlighting) - MUST be loaded last
-[ -f "$HOME/.config/zsh/plugins.zsh" ] && source "$HOME/.config/zsh/plugins.zsh"
+# Load all modular config files safely
+# Files are loaded in alphanumeric order (00-*, 05-*, etc.)
+for f in ~/.zsh.d/*.zsh; do
+  [ -f "$f" ] && source "$f"
+done
 
 # Local machine-specific config (gitignored - for Herd, work-specific stuff, etc.)
 [ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
