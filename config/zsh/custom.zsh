@@ -23,6 +23,11 @@ export BAT_PAGER="less -RFX"
 # -X: don't clear screen on exit
 # Note: Removed --mouse flag as it causes escape sequences to leak
 
+# NVM (Node Version Manager)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
 # Pipenv
 export PIPENV_VENV_IN_PROJECT=1
 
@@ -50,7 +55,8 @@ export FZF_DEFAULT_COMMAND='rg --hidden -l ""' # Include hidden files
 bindkey "ç" fzf-cd-widget # Fix for ALT+C on Mac
 
 # zoxide - a better cd command
-eval "$(zoxide init zsh)"
+# Disable in non-interactive contexts like Claude Code (avoids __zoxide_z errors)
+[ -z "$NONINTERACTIVE" ] && eval "$(zoxide init zsh)"
 
 # thefuck - corrects your previous console command
 eval $(thefuck --alias)

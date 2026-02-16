@@ -1,0 +1,6 @@
+{
+  "model": "sonnet",
+  "env": {
+    "NONINTERACTIVE": "1"
+  }
+}
