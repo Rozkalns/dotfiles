@@ -1,4 +1,4 @@
-.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent motd git-setup help test
+.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent motd git-setup help test sync
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -27,6 +27,13 @@ linux: core brew link motd
 	@echo "    source ~/.zshrc"
 	@echo ""
 
+# Pull latest changes and re-apply symlinks
+sync:
+	@echo "==> Pulling latest dotfiles..."
+	@git -C "$(dir $(abspath $(lastword $(MAKEFILE_LIST))))" pull
+	@$(MAKE) link
+	@echo "✅ Dotfiles synced. Run 'source ~/.zshrc' to apply shell changes."
+
 # Core setup (bin utilities available)
 core:
 	@echo "==> Setting up core..."
@@ -41,6 +48,7 @@ link:
 	@command -v stow >/dev/null 2>&1 || { echo "❌ stow not installed. Run 'brew install stow' first."; exit 1; }
 	@stow -t "$$HOME" runcom
 	@stow -t "$$HOME" vim
+	@stow -t "$$HOME" zsh.d
 	@stow -t "$$HOME/.config" config
 	@echo "✅ Symlinks created"
 
@@ -120,6 +128,7 @@ unlink:
 	@echo "==> Removing symbolic links..."
 	@stow -t "$$HOME" -D runcom || true
 	@stow -t "$$HOME" -D vim || true
+	@stow -t "$$HOME" -D zsh.d || true
 	@stow -t "$$HOME/.config" -D config || true
 	@echo "✅ Symlinks removed"
 
@@ -151,6 +160,7 @@ help:
 	@echo "  make phpstorm     Configure PhpStorm fonts (macOS)"
 	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
 	@echo "  make motd         Install MOTD update reminder (Linux)"
+	@echo "  make sync         Pull latest changes and re-apply symlinks"
 	@echo "  make git-setup    Setup Git user configuration"
 	@echo "  make update       Update all packages (uses topgrade)"
 	@echo "  make unlink       Remove all symlinks"
