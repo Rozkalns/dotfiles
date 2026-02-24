@@ -1,6 +1,7 @@
 {
   "model": "sonnet",
   "env": {
-    "NONINTERACTIVE": "1"
+    "NONINTERACTIVE": "1",
+    "WORK_PLANS_DIR": "/Users/roberts/Documents/000_Work/plans"
   }
 }
