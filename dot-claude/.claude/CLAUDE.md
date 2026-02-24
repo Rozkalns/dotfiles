@@ -1,2 +1,3 @@
 - always use ripgrep (rg) instead of grep or find
 - never add "Co-Authored-By" lines to git commits
+- for git commit messages, follow the project's CONTRIBUTING.md if present, otherwise default to Conventional Commits
