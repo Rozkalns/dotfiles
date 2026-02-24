@@ -1,4 +1,4 @@
-.PHONY: all macos linux link core brew themes dock defaults phpstorm topgrade-agent motd git-setup help test sync
+.PHONY: all macos linux link core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup help test sync
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -12,7 +12,7 @@ endif
 all: $(OS)
 
 # macOS installation
-macos: core brew link themes dock defaults phpstorm topgrade-agent
+macos: core brew link themes dock defaults duti phpstorm topgrade-agent
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -86,6 +86,17 @@ else
 	@echo "Skipping macOS defaults (not macOS)"
 endif
 
+# Apply file associations
+duti:
+ifeq ($(OS),macos)
+	@echo "==> Applying file associations..."
+	@command -v duti >/dev/null 2>&1 || { echo "❌ duti not installed. Run 'brew install duti' first."; exit 1; }
+	@duti macos/duti
+	@echo "✅ File associations applied"
+else
+	@echo "Skipping file associations (not macOS)"
+endif
+
 # Configure PhpStorm
 phpstorm:
 ifeq ($(OS),macos)
@@ -157,6 +168,7 @@ help:
 	@echo "  make themes       Install Catppuccin themes only"
 	@echo "  make dock         Setup Dock only (macOS)"
 	@echo "  make defaults     Apply macOS defaults only"
+	@echo "  make duti         Apply file associations (macOS)"
 	@echo "  make phpstorm     Configure PhpStorm fonts (macOS)"
 	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
 	@echo "  make motd         Install MOTD update reminder (Linux)"
