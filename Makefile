@@ -1,4 +1,4 @@
-.PHONY: all macos linux link core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup help test sync
+.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup help test sync
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -12,7 +12,7 @@ endif
 all: $(OS)
 
 # macOS installation
-macos: core brew link themes dock defaults duti phpstorm topgrade-agent
+macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -20,7 +20,7 @@ macos: core brew link themes dock defaults duti phpstorm topgrade-agent
 	@echo ""
 
 # Linux installation
-linux: core brew link motd
+linux: core brew link hooks motd
 	@echo "✅ Linux dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -32,6 +32,7 @@ sync:
 	@echo "==> Pulling latest dotfiles..."
 	@git -C "$(dir $(abspath $(lastword $(MAKEFILE_LIST))))" pull
 	@$(MAKE) link
+	@$(MAKE) hooks
 	@echo "✅ Dotfiles synced. Run 'source ~/.zshrc' to apply shell changes."
 
 # Core setup (bin utilities available)
@@ -49,8 +50,15 @@ link:
 	@stow -t "$$HOME" runcom
 	@stow -t "$$HOME" vim
 	@stow -t "$$HOME" zsh.d
+	@stow -t "$$HOME" dot-claude
 	@stow -t "$$HOME/.config" config
 	@echo "✅ Symlinks created"
+
+# Install git hooks
+hooks:
+	@echo "==> Installing git hooks..."
+	@ln -sf "$(CURDIR)/scripts/hooks/post-merge" "$(CURDIR)/.git/hooks/post-merge"
+	@echo "✅ Git hooks installed"
 
 # Install Homebrew packages
 brew:
@@ -140,6 +148,7 @@ unlink:
 	@stow -t "$$HOME" -D runcom || true
 	@stow -t "$$HOME" -D vim || true
 	@stow -t "$$HOME" -D zsh.d || true
+	@stow -t "$$HOME" -D dot-claude || true
 	@stow -t "$$HOME/.config" -D config || true
 	@echo "✅ Symlinks removed"
 
@@ -164,6 +173,7 @@ help:
 	@echo "  make macos        Install for macOS"
 	@echo "  make linux        Install for Linux"
 	@echo "  make link         Create symlinks only"
+	@echo "  make hooks        Install git hooks"
 	@echo "  make brew         Install Homebrew packages only"
 	@echo "  make themes       Install Catppuccin themes only"
 	@echo "  make dock         Setup Dock only (macOS)"
