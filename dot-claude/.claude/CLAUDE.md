@@ -1,4 +1,2 @@
-- instead of grep, use ripgrep
-- instead of grep or find, ripgrep (rg) could be used
-- always use ripgrep (rg) instead of grep
+- always use ripgrep (rg) instead of grep or find
 - never add "Co-Authored-By" lines to git commits
