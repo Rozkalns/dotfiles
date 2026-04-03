@@ -1,12 +1,6 @@
 # Aliases for modern CLI tools
 # These replace traditional Unix commands with improved alternatives
 
-# Navigation
-# Use zoxide (smarter cd) - only if installed
-if command -v zoxide &> /dev/null; then
-    alias cd='z'
-fi
-
 # File viewing
 # bat - cat with syntax highlighting and git integration
 if command -v bat &> /dev/null; then
