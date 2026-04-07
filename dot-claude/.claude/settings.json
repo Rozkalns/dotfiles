@@ -1,0 +1,10 @@
+{
+  "effortLevel": "high",
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline.sh"
+  }
+}

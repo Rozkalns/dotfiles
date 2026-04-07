@@ -51,6 +51,10 @@ link:
 	@stow -t "$$HOME" vim
 	@stow -t "$$HOME" zsh.d
 	@stow -t "$$HOME" dot-claude
+	@if [ ! -f "$$HOME/.claude/settings.local.json" ] && [ -f "$$HOME/.claude/settings.local.json.example" ]; then \
+		cp "$$HOME/.claude/settings.local.json.example" "$$HOME/.claude/settings.local.json"; \
+		echo "  Created ~/.claude/settings.local.json from example (edit for this machine)"; \
+	fi
 	@stow -t "$$HOME/.config" config
 	@echo "✅ Symlinks created"
 

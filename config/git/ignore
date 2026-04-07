@@ -32,3 +32,5 @@ logs/
 # Temporary files
 *.tmp
 .cache/
+
+**/.claude/settings.local.json
