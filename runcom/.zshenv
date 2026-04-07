@@ -19,7 +19,7 @@ export VISUAL="nvim"
 
 # Add /usr/local/bin to the beginning of the PATH environment variable.
 # This ensures that executables in /usr/local/bin are found before other directories in the PATH.
-export PATH="/usr/local/bin:$PATH"
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 
 # Hide computer name in terminal
 export DEFAULT_USER="$(whoami)"
