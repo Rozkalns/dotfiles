@@ -20,6 +20,9 @@ brew "tig"
 brew "btop"
 brew "topgrade"  # Universal package updater
 
+# Document conversion
+brew "pandoc"
+
 # Development tools
 # brew "composer"  # Not needed - bundled with Herd
 brew "curl"

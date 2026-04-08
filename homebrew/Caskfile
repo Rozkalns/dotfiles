@@ -11,6 +11,9 @@ cask "docker-desktop"
 cask "herd"
 cask "phpstorm"
 
+# Document conversion
+cask "basictex"  # Minimal TeX Live for pandoc PDF generation
+
 # Utilities
 cask "hiddenbar"
 cask "openvpn-connect"
