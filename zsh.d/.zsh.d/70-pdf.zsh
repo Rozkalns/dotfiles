@@ -1,5 +1,6 @@
 # PDF generation via pandoc + xelatex
 # Requires: brew install pandoc && brew install --cask basictex
+# Optional: npm install -g mermaid-filter (for mermaid diagram support)
 
 pdf() {
     if ! command -v pandoc &> /dev/null; then
@@ -18,10 +19,15 @@ pdf() {
         echo "Usage: pdf <input.md> [output.pdf]"
         echo ""
         echo "Converts Markdown to PDF using pandoc + xelatex."
+        echo "Mermaid diagrams are rendered automatically if mermaid-filter is installed."
         echo ""
         echo "Examples:"
         echo "  pdf notes.md                    # -> notes.pdf"
         echo "  pdf notes.md output.pdf         # -> output.pdf"
+        echo ""
+        echo "Setup:"
+        echo "  brew install pandoc && brew install --cask basictex"
+        echo "  npm install -g mermaid-filter   # optional, for mermaid diagrams"
         echo ""
         echo "If xelatex complains about a missing .sty package:"
         echo "  sudo tlmgr install <package>"
@@ -34,10 +40,16 @@ pdf() {
     fi
 
     local output="${2:-${input%.md}.pdf}"
+    local filter_args=()
+
+    if command -v mermaid-filter &> /dev/null; then
+        filter_args+=(--filter mermaid-filter)
+    fi
 
     pandoc "$input" -o "$output" \
         --pdf-engine=xelatex \
         -V geometry:margin=1in \
         -V monofont="Menlo" \
+        "${filter_args[@]}" \
         && echo "Created: $output"
 }

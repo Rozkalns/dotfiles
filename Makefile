@@ -1,4 +1,4 @@
-.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup help test sync
+.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -12,7 +12,7 @@ endif
 all: $(OS)
 
 # macOS installation
-macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent
+macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent pdf
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -127,6 +127,11 @@ else
 	@echo "Skipping Topgrade LaunchAgent (not macOS)"
 endif
 
+# Install PDF toolchain (LaTeX packages + mermaid-filter)
+pdf:
+	@echo "==> Setting up PDF toolchain..."
+	@./scripts/basictex-packages.sh
+
 # Setup MOTD (Linux)
 motd:
 ifeq ($(OS),linux)
@@ -186,6 +191,7 @@ help:
 	@echo "  make phpstorm     Configure PhpStorm fonts (macOS)"
 	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
 	@echo "  make motd         Install MOTD update reminder (Linux)"
+	@echo "  make pdf          Install PDF toolchain (LaTeX + mermaid)"
 	@echo "  make sync         Pull latest changes and re-apply symlinks"
 	@echo "  make git-setup    Setup Git user configuration"
 	@echo "  make update       Update all packages (uses topgrade)"
