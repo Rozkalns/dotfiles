@@ -62,6 +62,7 @@ link:
 hooks:
 	@echo "==> Installing git hooks..."
 	@ln -sf "$(CURDIR)/scripts/hooks/post-merge" "$(CURDIR)/.git/hooks/post-merge"
+	@ln -sf "$(CURDIR)/scripts/hooks/post-rewrite" "$(CURDIR)/.git/hooks/post-rewrite"
 	@echo "✅ Git hooks installed"
 
 # Install Homebrew packages
