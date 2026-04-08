@@ -2,7 +2,7 @@
 
 # Install everything needed for pandoc PDF generation:
 # - LaTeX packages (via tlmgr, requires BasicTeX)
-# - mermaid-filter (via npm, for mermaid diagram support)
+# - mermaid-cli (via npm, for mermaid diagram support)
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$_SCRIPT_DIR/../bin:$PATH"
@@ -25,15 +25,15 @@ else
     error "Then restart your shell and re-run this script."
 fi
 
-# Mermaid filter
+# Mermaid CLI
 if command -v npm &> /dev/null; then
-    if command -v mermaid-filter &> /dev/null; then
-        success "mermaid-filter already installed."
+    if command -v mmdc &> /dev/null; then
+        success "mermaid-cli already installed."
     else
-        info "Installing mermaid-filter for diagram support..."
-        npm install -g mermaid-filter
-        success "mermaid-filter installed."
+        info "Installing @mermaid-js/mermaid-cli for diagram support..."
+        npm install -g @mermaid-js/mermaid-cli
+        success "mermaid-cli installed."
     fi
 else
-    warning "npm not found — skipping mermaid-filter. Install Node.js first if you need diagram support."
+    warning "npm not found — skipping mermaid-cli. Install Node.js first if you need diagram support."
 fi
