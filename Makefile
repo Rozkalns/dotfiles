@@ -1,4 +1,4 @@
-.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync
+.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync additional
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -174,6 +174,20 @@ test:
 	@echo "Checking bin utilities..."
 	@command -v is-macos >/dev/null 2>&1 && echo "✅ bin utilities in PATH" || echo "❌ bin utilities not in PATH"
 
+# Show additional apps that need manual installation
+additional:
+	@echo ""
+	@echo "Additional apps (manual install):"
+	@echo ""
+	@tail -n +5 additional-apps.md | grep '|' | grep -v '^|[-]' | grep -v '| App' | while IFS='|' read -r _ app desc url _; do \
+		app=$$(echo "$$app" | xargs); \
+		desc=$$(echo "$$desc" | xargs); \
+		url=$$(echo "$$url" | xargs); \
+		echo "  $$app - $$desc"; \
+		echo "    $$url"; \
+	done
+	@echo ""
+
 # Help
 help:
 	@echo "Dotfiles Management"
@@ -198,4 +212,5 @@ help:
 	@echo "  make update       Update all packages (uses topgrade)"
 	@echo "  make unlink       Remove all symlinks"
 	@echo "  make test         Test installation"
+	@echo "  make additional    Show apps that need manual installation"
 	@echo "  make help         Show this help"
