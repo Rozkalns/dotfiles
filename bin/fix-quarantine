@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+# Scan /Applications for quarantined apps and interactively fix them
+# Remembers past decisions in ~/.local/share/fix-quarantine/history
+
+dir="/Applications"
+history_dir="$HOME/.local/share/fix-quarantine"
+history_file="$history_dir/history"
+
+mkdir -p "$history_dir"
+touch "$history_file"
+
+last_cleared() {
+  grep "^cleared	$1	" "$history_file" | tail -1 | cut -f3
+}
+
+# Collect quarantined apps into known (previously cleared) and new
+known_apps=()
+known_dates=()
+new_apps=()
+
+while IFS= read -r -d '' app; do
+  xattr -p com.apple.quarantine "$app" >/dev/null 2>&1 || continue
+  name=$(basename "$app")
+  prev=$(last_cleared "$name")
+  if [ -n "$prev" ]; then
+    known_apps+=("$app")
+    known_dates+=("$prev")
+  else
+    new_apps+=("$app")
+  fi
+done < <(find "$dir" -maxdepth 1 -name "*.app" -print0)
+
+if [ ${#known_apps[@]} -eq 0 ] && [ ${#new_apps[@]} -eq 0 ]; then
+  echo "No quarantined apps found in $dir"
+  exit 0
+fi
+
+# Handle previously cleared apps as a batch
+if [ ${#known_apps[@]} -gt 0 ]; then
+  echo ""
+  echo "Previously cleared apps (quarantined again):"
+  for i in "${!known_apps[@]}"; do
+    echo "   $(basename "${known_apps[$i]}")  (last cleared: ${known_dates[$i]})"
+  done
+  echo ""
+  read -rp "Clear all ${#known_apps[@]} known apps? [y/n] > " batch </dev/tty
+  if [[ "$batch" =~ ^[yY]$ ]]; then
+    for app in "${known_apps[@]}"; do
+      name=$(basename "$app")
+      xattr -rd com.apple.quarantine "$app"
+      echo -e "cleared\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
+    done
+    echo "   ✅ All known apps cleared"
+  else
+    echo "   ⏭  Skipped"
+  fi
+fi
+
+# Handle new apps interactively
+for app in "${new_apps[@]}"; do
+  name=$(basename "$app")
+  attr=$(xattr -p com.apple.quarantine "$app" 2>/dev/null) || continue
+
+  echo ""
+  echo "⚠  $name"
+  echo "   Quarantine: $attr"
+
+  while true; do
+    read -rp "   [y] remove quarantine  [n] skip  [t] trash  > " choice </dev/tty
+    case "$choice" in
+      y|Y)
+        xattr -rd com.apple.quarantine "$app"
+        echo -e "cleared\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
+        echo "   ✅ Quarantine removed"
+        break
+        ;;
+      n|N)
+        echo "   ⏭  Skipped"
+        break
+        ;;
+      t|T)
+        osascript -e "tell application \"Finder\" to delete POSIX file \"$app\"" >/dev/null 2>&1
+        echo -e "trashed\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
+        echo "   🗑  Moved to Trash"
+        break
+        ;;
+      *)
+        echo "   Invalid choice, try again"
+        ;;
+    esac
+  done
+done
