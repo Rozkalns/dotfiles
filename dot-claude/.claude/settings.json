@@ -1,7 +1,10 @@
 {
   "env": {
-    "DISABLE_AUTOUPDATER": "1"
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
+    "MAX_THINKING_TOKENS": "128000"
   },
+  "model": "claude-opus-4-6[1M]",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline.sh"
@@ -10,7 +13,16 @@
     "php-lsp@claude-plugins-official": true,
     "feature-dev@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
+    "claude-md-management@claude-plugins-official": true,
+    "diagram-design@diagram-design": true
+  },
+  "extraKnownMarketplaces": {
+    "diagram-design": {
+      "source": {
+        "source": "github",
+        "repo": "cathrynlavery/diagram-design"
+      }
+    }
   },
   "effortLevel": "high"
 }
