@@ -35,7 +35,7 @@ brew "wget"
 brew "xz"
 
 # Python
-brew "pyenv"
+brew "uv"
 
 # Shell enhancements
 brew "starship"

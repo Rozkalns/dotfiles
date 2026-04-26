@@ -2,7 +2,6 @@
 # This file is only processed on macOS
 
 # Terminals
-cask "claude-code"
 cask "wezterm"
 
 # Development

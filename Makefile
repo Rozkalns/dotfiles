@@ -1,4 +1,4 @@
-.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync additional
+.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync additional migrate
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -12,7 +12,7 @@ endif
 all: $(OS)
 
 # macOS installation
-macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent pdf
+macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent pdf migrate
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -20,7 +20,7 @@ macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent pd
 	@echo ""
 
 # Linux installation
-linux: core brew link hooks motd
+linux: core brew link hooks motd migrate
 	@echo "✅ Linux dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -142,6 +142,11 @@ else
 	@echo "Skipping MOTD setup (not Linux)"
 endif
 
+# Run pending migrations
+migrate:
+	@echo "==> Running migrations..."
+	@./scripts/migrate.sh
+
 # Setup Git configuration
 git-setup:
 	@echo "==> Setting up Git configuration..."
@@ -207,6 +212,7 @@ help:
 	@echo "  make topgrade-agent Install Topgrade LaunchAgent (macOS)"
 	@echo "  make motd         Install MOTD update reminder (Linux)"
 	@echo "  make pdf          Install PDF toolchain (LaTeX + mermaid)"
+	@echo "  make migrate      Run pending dotfiles migrations"
 	@echo "  make sync         Pull latest changes and re-apply symlinks"
 	@echo "  make git-setup    Setup Git user configuration"
 	@echo "  make update       Update all packages (uses topgrade)"

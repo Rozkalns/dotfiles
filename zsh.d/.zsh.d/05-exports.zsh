@@ -10,5 +10,3 @@ export BAT_PAGER="less -RFX"
 # Neovim as MANPAGER
 export MANPAGER='nvim +Man!'
 
-# Pipenv
-export PIPENV_VENV_IN_PROJECT=1

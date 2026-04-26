@@ -54,5 +54,4 @@ fetch_only = true
 # yay_arguments = "--devel"
 
 [python]
-# Enable pipx package updates
-# enable_pipx = true
+enable_pipx = true
