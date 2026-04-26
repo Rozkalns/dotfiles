@@ -48,10 +48,13 @@ if [ ${#known_apps[@]} -gt 0 ]; then
   if [[ "$batch" =~ ^[yY]$ ]]; then
     for app in "${known_apps[@]}"; do
       name=$(basename "$app")
-      xattr -rd com.apple.quarantine "$app"
-      echo -e "cleared\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
+      sudo xattr -d com.apple.quarantine "$app" 2>/dev/null
+      if ! xattr -p com.apple.quarantine "$app" >/dev/null 2>&1; then
+        echo -e "cleared\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
+      else
+        echo "   ⚠  Failed: $name (open System Settings → Privacy & Security → Open Anyway)"
+      fi
     done
-    echo "   ✅ All known apps cleared"
   else
     echo "   ⏭  Skipped"
   fi
@@ -70,9 +73,13 @@ for app in "${new_apps[@]}"; do
     read -rp "   [y] remove quarantine  [n] skip  [t] trash  > " choice </dev/tty
     case "$choice" in
       y|Y)
-        xattr -rd com.apple.quarantine "$app"
-        echo -e "cleared\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
-        echo "   ✅ Quarantine removed"
+        sudo xattr -d com.apple.quarantine "$app" 2>/dev/null
+        if ! xattr -p com.apple.quarantine "$app" >/dev/null 2>&1; then
+          echo -e "cleared\t$name\t$(date '+%Y-%m-%d %H:%M')" >> "$history_file"
+          echo "   ✅ Quarantine removed"
+        else
+          echo "   ❌ Failed (open System Settings → Privacy & Security → Open Anyway)"
+        fi
         break
         ;;
       n|N)
