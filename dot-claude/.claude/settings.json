@@ -14,13 +14,20 @@
     "feature-dev@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "diagram-design@diagram-design": true
+    "diagram-design@diagram-design": true,
+    "ros7skill@claude-ros7-skill": true
   },
   "extraKnownMarketplaces": {
     "diagram-design": {
       "source": {
         "source": "github",
         "repo": "cathrynlavery/diagram-design"
+      }
+    },
+    "claude-ros7-skill": {
+      "source": {
+        "source": "github",
+        "repo": "MrOplus/claude-ros7-skill"
       }
     }
   },
