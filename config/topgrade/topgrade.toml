@@ -7,7 +7,7 @@ assume_yes = true
 
 # Disable specific update steps you don't want
 # disable = ["containers", "git_repos"]
-disable = ["containers", "tlmgr", "microsoft_office", "node"]
+disable = ["containers", "tlmgr", "microsoft_office", "node", "npm"]
 
 # Don't show elapsed time
 display_time = false
