@@ -54,4 +54,4 @@ fetch_only = true
 # yay_arguments = "--devel"
 
 [python]
-enable_pipx = true
+# pipx/uv tool upgrades run automatically when detected
