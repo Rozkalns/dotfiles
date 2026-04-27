@@ -21,4 +21,5 @@ cask "rectangle"
 cask "shottr"
 cask "spotify"
 # cask "superwhisper"  # Temporarily disabled - slow download
+cask "puremac"
 cask "winbox"
