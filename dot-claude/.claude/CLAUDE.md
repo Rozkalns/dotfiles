@@ -1,3 +1,5 @@
-- always use ripgrep (rg) instead of grep or find
 - never add "Co-Authored-By" lines to git commits
 - for git commit messages, follow the project's CONTRIBUTING.md if present, otherwise default to Conventional Commits
+- use `jq` for JSON parsing in bash, not `python3 -c "import json..."`
+- **local dev:** use `rg` (ripgrep) instead of grep or find
+- **server (production/staging):** use standard POSIX tools only (`grep`, `find`, `awk`, `sed`) — do not assume `rg` or other non-default tools are installed
