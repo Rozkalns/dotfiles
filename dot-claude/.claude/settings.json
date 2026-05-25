@@ -15,7 +15,8 @@
     "skill-creator@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "diagram-design@diagram-design": true,
-    "ros7skill@claude-ros7-skill": true
+    "ros7skill@claude-ros7-skill": true,
+    "plugin-dev@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "diagram-design": {
@@ -29,8 +30,15 @@
         "source": "github",
         "repo": "MrOplus/claude-ros7-skill"
       }
+    },
+    "xdebug-mcp": {
+      "source": {
+        "source": "github",
+        "repo": "koriym/xdebug-mcp"
+      }
     }
   },
   "effortLevel": "high",
-  "tui": "fullscreen"
+  "tui": "fullscreen",
+  "skipAutoPermissionPrompt": true
 }
