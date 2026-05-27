@@ -16,6 +16,9 @@
     "claude-md-management@claude-plugins-official": true,
     "diagram-design@diagram-design": true,
     "ros7skill@claude-ros7-skill": true,
+    "frontend-design@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
     "plugin-dev@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
@@ -40,5 +43,6 @@
   },
   "effortLevel": "high",
   "tui": "fullscreen",
+  "theme": "dark",
   "skipAutoPermissionPrompt": true
 }
