@@ -163,7 +163,7 @@ colorscheme industry
 " hi VertSplit guibg=NONE guifg=NONE ctermbg=NONE ctermfg=NONE
 
 " Sync clipboard with OS
-if system('uname -s') == "Darwin\n"
+if has('mac')
   set clipboard=unnamed "OSX
 else
   set clipboard=unnamedplus "Linux
