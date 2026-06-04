@@ -65,6 +65,7 @@ make
 - Automated Dock setup
 - Default file associations
 - Hot corner: bottom-left locks screen
+- Touch ID for `sudo` (via `/etc/pam.d/sudo_local`, survives OS updates)
 
 ### 🔧 Utilities
 - **GNU stow** — symlink management
