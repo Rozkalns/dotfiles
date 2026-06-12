@@ -3,4 +3,5 @@
 - use `jq` for JSON parsing in bash, not `python3 -c "import json..."`
 - **local dev:** use `rg` (ripgrep) instead of grep or find
 - **server (production/staging):** use standard POSIX tools only (`grep`, `find`, `awk`, `sed`) — do not assume `rg` or other non-default tools are installed
+- **server inventory:** `~/code/server/projects.yaml` (local only, outside this repo) is the source of truth for the personal server and its sites — per site: domains, repo, branch, deploy path, zero-downtime mode, CI, alerts, plus the deploy CLI and workflow. Read it before any server/site work instead of rediscovering layout.
 - **memory search:** when recalling something from memory, always search BOTH `~/.claude/memory/` (global) AND `~/.claude/projects/<project>/memory/` (project-specific)
