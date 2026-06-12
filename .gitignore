@@ -7,3 +7,8 @@ system/.exports
 
 # Composer global packages (managed by Herd/system, not dotfiles)
 config/composer/
+
+# Pre-push secret guard — MUST stay local-only (this repo is PUBLIC).
+# The denylist literally contains infra identifiers (server name, IP); never commit it.
+config/git/secret-denylist.txt
+config/git/hooks/
