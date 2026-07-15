@@ -7,7 +7,9 @@ assume_yes = true
 
 # Disable specific update steps you don't want
 # disable = ["containers", "git_repos"]
-disable = ["containers", "tlmgr", "microsoft_office", "node"]
+# claude_code disabled here: its built-in step renders a spinner that grabs the
+# tty and gets SIGTTOU'd (job suspends). Replaced by a piped custom command below.
+disable = ["containers", "tlmgr", "microsoft_office", "node", "claude_code"]
 
 # Don't show elapsed time
 display_time = false
@@ -21,6 +23,13 @@ cleanup = true
 [commands]
 # Custom commands to run during updates
 # "npm" = "npm update --location global --force"
+
+# Replacement for the built-in claude_code step (disabled above). Claude Code is
+# an Ink/Node TUI that enables raw mode (tcsetattr) whenever stdin is a terminal;
+# from topgrade's background process group that raises SIGTTOU -> "suspended (tty
+# output)". Redirecting stdin from /dev/null makes stdin.isTTY false so Claude
+# stays non-interactive; `| cat` likewise keeps stdout non-tty (no spinner).
+"Claude Code" = "{ claude update; claude plugin marketplace update; } </dev/null 2>&1 | cat"
 
 [brew]
 # Automatically upgrade outdated casks (even those with auto-update like PhpStorm, Rectangle, Raycast)
