@@ -20,7 +20,7 @@ PLUGIN="vault-brain"
 up() {
     if ! command -v claude >/dev/null 2>&1; then
         warning "claude CLI not found; skipping vault-brain plugin install."
-        return 0
+        return "$SKIP_EXIT"
     fi
 
     if claude plugin list 2>/dev/null | grep -q "$PLUGIN@$MARKETPLACE_NAME"; then
@@ -30,18 +30,23 @@ up() {
 
     # The marketplace is a private repo. Check reachability before trying, so a
     # machine without the key gives a clear message instead of a git error.
-    if ! ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
-             -o ConnectTimeout=5 -T git@github.com 2>&1 | grep -q 'successfully authenticated'; then
+    #
+    # `ssh -T git@github.com` exits 1 even when auth succeeds ("does not provide
+    # shell access"), so this must not be a pipeline — migrate.sh runs under
+    # `set -o pipefail`, which would propagate that 1 and make the check always fail.
+    probe="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+                 -o ConnectTimeout=5 -T git@github.com 2>&1 || true)"
+    if [[ "$probe" != *"successfully authenticated"* ]]; then
         warning "No SSH access to GitHub; skipping vault-brain (private repo)."
         info "Once your key is set up:  claude plugin marketplace add $MARKETPLACE"
-        return 0
+        return "$SKIP_EXIT"
     fi
 
     if ! claude plugin marketplace list 2>/dev/null | grep -q "$MARKETPLACE_NAME"; then
         info "Adding $MARKETPLACE_NAME marketplace..."
         if ! claude plugin marketplace add "$MARKETPLACE" >/dev/null 2>&1; then
             warning "Could not add $MARKETPLACE_NAME marketplace; skipping."
-            return 0
+            return "$SKIP_EXIT"
         fi
     fi
 
@@ -53,5 +58,6 @@ up() {
     else
         warning "Could not install $PLUGIN; add it by hand with:"
         info "  claude plugin install $PLUGIN@$MARKETPLACE_NAME"
+        return "$SKIP_EXIT"
     fi
 }
