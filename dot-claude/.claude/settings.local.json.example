@@ -1,4 +1,21 @@
 {
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/block-no-verify.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/block-rg-bundled-replace.sh"
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
     "atlassian@claude-plugins-official": true,
     "mapon-work-items@mapon-claude-plugins": true
