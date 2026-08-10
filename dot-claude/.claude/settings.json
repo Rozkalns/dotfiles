@@ -5,24 +5,42 @@
     "MAX_THINKING_TOKENS": "128000",
     "CLAUDE_CODE_DISABLE_MOUSE_CLICKS": "1"
   },
+  "model": "opus[1m]",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/roberts/.claude/hooks/block-no-verify.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/roberts/.claude/hooks/block-rg-bundled-replace.sh"
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline.sh"
   },
   "enabledPlugins": {
     "php-lsp@claude-plugins-official": true,
-    "feature-dev@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": false,
     "skill-creator@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "diagram-design@diagram-design": true,
+    "diagram-design@diagram-design": false,
     "ros7skill@claude-ros7-skill": true,
     "frontend-design@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "plugin-dev@claude-plugins-official": true,
+    "code-review@claude-plugins-official": false,
+    "plugin-dev@claude-plugins-official": false,
     "code-simplifier@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true,
-    "playwright@claude-plugins-official": true
+    "playwright@claude-plugins-official": true,
+    "vault-brain@claude-vault-brain": true
   },
   "extraKnownMarketplaces": {
     "diagram-design": {
@@ -41,6 +59,12 @@
       "source": {
         "source": "github",
         "repo": "koriym/xdebug-mcp"
+      }
+    },
+    "claude-vault-brain": {
+      "source": {
+        "source": "github",
+        "repo": "Rozkalns/claude-vault-brain"
       }
     }
   },
