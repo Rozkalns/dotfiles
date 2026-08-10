@@ -1,3 +1,11 @@
 #!/usr/bin/env bash
-# Runs after every `git pull` — re-applies symlinks and runs pending migrations
-cd "$(git rev-parse --show-toplevel)" && make link && make migrate
+# Runs after every `git pull` — re-applies symlinks and runs pending migrations.
+#
+# Installed into core.hooksPath, which is global, so this fires on a pull in ANY
+# repo. Resolve our own real path back to the dotfiles checkout we were installed
+# from and no-op elsewhere — otherwise every unrelated pull runs `make link`.
+self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+origin_repo="${self%/scripts/hooks/*}"
+[ "$(git rev-parse --show-toplevel 2>/dev/null)" = "$origin_repo" ] || exit 0
+
+cd "$origin_repo" && make link && make migrate

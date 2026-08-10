@@ -58,12 +58,21 @@ link:
 	@stow -t "$$HOME/.config" config
 	@echo "✅ Symlinks created"
 
-# Install git hooks
+# Install git hooks into whichever directory git actually reads.
+# core.hooksPath — set globally so the pre-push secret guard applies everywhere —
+# replaces .git/hooks entirely rather than adding to it, so installing there
+# would be silently dead. The hooks self-limit to this repo; see scripts/hooks/.
 hooks:
 	@echo "==> Installing git hooks..."
-	@ln -sf "$(CURDIR)/scripts/hooks/post-merge" "$(CURDIR)/.git/hooks/post-merge"
-	@ln -sf "$(CURDIR)/scripts/hooks/post-rewrite" "$(CURDIR)/.git/hooks/post-rewrite"
-	@echo "✅ Git hooks installed"
+	@dest="$$(git -C "$(CURDIR)" config --get core.hooksPath)"; \
+	 [ -n "$$dest" ] || dest="$(CURDIR)/.git/hooks"; \
+	 mkdir -p "$$dest"; \
+	 ln -sf "$(CURDIR)/scripts/hooks/post-merge" "$$dest/post-merge"; \
+	 ln -sf "$(CURDIR)/scripts/hooks/post-rewrite" "$$dest/post-rewrite"; \
+	 if [ "$$dest" != "$(CURDIR)/.git/hooks" ]; then \
+	   rm -f "$(CURDIR)/.git/hooks/post-merge" "$(CURDIR)/.git/hooks/post-rewrite"; \
+	 fi; \
+	 echo "✅ Git hooks installed into $$dest"
 
 # Install Homebrew packages
 brew:
