@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Claude Code status line (2 lines, color-coded thresholds)
 # Line 1: model | context | 5h limit | 7d limit
-# Line 2: top 3 tools
+# Line 2: last 3 distinct tools, then last 3 distinct skills — most recent
+#         first, each with its session total
 
 input=$(cat)
 
@@ -89,26 +90,43 @@ if [ -z "$rate" ]; then
   rate="${DIM}limits: --${RESET}"
 fi
 
-# Top 3 tools from transcript
-tools=""
+# Tool + skill usage from transcript (single pass: "T<tab>name" / "S<tab>skill")
+# Skill calls are tallied as skills, not as a "Skill" tool.
+usage=""
 if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-  tools=$(jq -r '
+  usage=$(jq -r '
     select(.type == "assistant") |
     .message.content[]? |
     select(.type == "tool_use") |
-    .name
-  ' "$transcript" 2>/dev/null \
-    | sort | uniq -c | sort -rn | head -3 \
-    | awk '{printf "%s(%d) ", $2, $1}' \
-    | sed 's/ $//')
+    if .name == "Skill"
+    then "S\t" + (.input.skill // "?")
+    else "T\t" + .name
+    end
+  ' "$transcript" 2>/dev/null)
 fi
+
+# Last 3 distinct names of one kind (T|S), most recent first, each with its total
+recent_of() {
+  printf '%s\n' "$usage" | awk -F'\t' -v kind="$1" '
+    $1 == kind { n++; seq[n] = $2; total[$2]++ }
+    END {
+      for (i = n; i >= 1 && shown < 3; i--) {
+        name = seq[i]
+        if (name in seen) continue
+        seen[name] = 1
+        shown++
+        out = out (shown > 1 ? " › " : "") name "(" total[name] ")"
+      }
+      print out
+    }'
+}
+
+tools_recent=$(recent_of T)
+skills_recent=$(recent_of S)
 
 # Line 1: model | context | rate limits
 printf '%b' "${model} | ctx ${ctx} | ${rate}\n"
 
-# Line 2: top tools
-if [ -n "$tools" ]; then
-  printf '%b' "${DIM}${tools}${RESET}"
-else
-  printf '%b' "${DIM}no tools yet${RESET}"
-fi
+# Line 2: tools and skills, most recent first.
+# Labels sit at default weight to match line 1's "ctx"/"5h:"; entries stay dim.
+printf '%b' "tools ${DIM}${tools_recent:-none yet}${RESET} | skills ${DIM}${skills_recent:-none}${RESET}"
