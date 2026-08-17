@@ -18,6 +18,10 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/block-rg-bundled-replace.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/block-prod-ssh.sh"
           }
         ]
       }
