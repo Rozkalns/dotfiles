@@ -10,6 +10,9 @@ If nothing was named, ask which one — do not pick.
 ## Before touching anything
 
 1. **Read the item in full** — the spec file, issue, or brief — plus whatever it links to for ordering and context. If it is a file, read the whole file, not the first screen.
+   If it sits in `docs/backlog/`, the `backlog` skill owns that format — its conventions,
+   its status line, its wrap-up. Follow them rather than inventing a parallel set, and
+   expect to hand back to it when the turn ends.
 2. **Restate the working context in under 10 bullets**: the goal, what's in scope, what proves it's done, the constraints, and anything the item records as already decided. Nothing else — no repo tour, no summary of things you haven't been asked about.
 3. **Name the deliverable in one sentence** — the PR title, the document produced, or the output expected.
 4. **State the smallest viable plan for the first phase only.**
@@ -28,6 +31,11 @@ If it has no automated checks — a document, a contract, a config change — sa
 - Keep searches targeted. No broad sweeps to get oriented.
 - **Treat the item's own claims as evidence, not fact.** Specs go stale and are often written without running anything. If one is disproved, say so, fix the item in the same change, and flag anywhere else that inherits the same claim.
 - **Record progress in the item, not the conversation** — tick its checkboxes or update its status as you go, so the work survives the session ending.
+- **Record where the work lives, not just what is done.** Checkboxes say a phase is
+  finished; they do not say it is sitting on an unmerged branch. A later session reading
+  only the ticks will start from the default branch and rebuild it. Keep a short block
+  near the top of the item naming the branch, the PR, what is merged, and anything
+  blocked on a person rather than on code — and update it whenever that changes.
 
 ## Stop conditions — any of these ends the turn
 
@@ -37,6 +45,23 @@ If it has no automated checks — a document, a contract, a config change — sa
 - **The change outgrows the item's stated scope.** File the rest separately; don't absorb it.
 
 ## Close every turn with the progress table
+
+**If the item lives in `docs/backlog/`, reconcile it with the `backlog` skill first.**
+That skill owns the format and has a wrap-up mode whose second step exists for exactly
+this moment: reading the file back and ticking anything that got done but never checked
+off. Run that reconciliation *before* the table, because the table counts checkboxes —
+if they are stale, the summary is confidently wrong, and a number that looks precise is
+worse than no number.
+
+Which parts of its wrap-up apply depends on where you stopped:
+
+- **Phase boundary or blocked** — reconcile the checkboxes and refresh the status line.
+  Nothing else: the item is not done, so it does not move.
+- **The whole item is finished** — the full wrap-up. Status to `Done`, a
+  `## Completion Notes` section covering anything that diverged from the spec, and
+  `git mv` into the project's done folder, matching whatever convention already exists
+  rather than inventing one.
+
 
 Whenever the turn ends — phase finished, blocked, or the whole item done — print where
 the item actually stands. Not a paraphrase: counted from the item's own checkboxes.
@@ -82,7 +107,7 @@ PY
 Use `#` and `·` for the bar. Do not use `█` — full-block glyphs tile seamlessly and a
 run of them renders as one white rectangle rather than a countable bar.
 
-Add a short status against each line where it helps — `merged`, `in #191`, `blocked on
+Add a short status against each line where it helps — `merged`, `in #<pr>`, `blocked on
 <who/what>` — and follow the table with three sentences, no more:
 
 - **What works now**, in user terms, not commits.
