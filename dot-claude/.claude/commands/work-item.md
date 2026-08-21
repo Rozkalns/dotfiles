@@ -36,6 +36,64 @@ If it has no automated checks — a document, a contract, a config change — sa
 - **The item is wrong** about something load-bearing.
 - **The change outgrows the item's stated scope.** File the rest separately; don't absorb it.
 
+## Close every turn with the progress table
+
+Whenever the turn ends — phase finished, blocked, or the whole item done — print where
+the item actually stands. Not a paraphrase: counted from the item's own checkboxes.
+
+The reason is drift. A green test run and a merged PR both *feel* like completion, and
+after a long session it is easy for "this phase is done" to slide into "this is done".
+The table makes the remaining work impossible to round down, and it separates three
+things that are constantly confused: the branch is green, the phase is finished, the
+feature is usable.
+
+Count `- [x]` against `- [ ]` under each `###` heading in the item:
+
+```bash
+python3 - "docs/backlog/THE-ITEM.md" <<'PY'
+import io, re, sys
+
+lines = io.open(sys.argv[1], encoding='utf-8').read().split('\n')
+section, counts, order = None, {}, []
+
+for line in lines:
+    heading = re.match(r'^#{2,3} (.+)', line)
+    if heading:
+        section = re.sub(r'\s*[—(].*', '', heading.group(1)).strip()[:44]
+        if section not in counts:
+            counts[section] = [0, 0]
+            order.append(section)
+    if section and line.startswith('- [x]'):
+        counts[section][0] += 1
+    if section and line.startswith('- [ ]'):
+        counts[section][1] += 1
+
+done = total = 0
+for section in order:
+    d, o = counts[section]
+    if d + o:
+        print(f"{section:<44} {d:>2}/{d + o:<3} {'#' * d}{'·' * o}")
+        done, total = done + d, total + d + o
+
+print(f"{'TOTAL':<44} {done:>2}/{total}")
+PY
+```
+
+Use `#` and `·` for the bar. Do not use `█` — full-block glyphs tile seamlessly and a
+run of them renders as one white rectangle rather than a countable bar.
+
+Add a short status against each line where it helps — `merged`, `in #191`, `blocked on
+<who/what>` — and follow the table with three sentences, no more:
+
+- **What works now**, in user terms, not commits.
+- **What that still isn't** — name the nearest thing a user would wrongly assume is
+  finished.
+- **What the next real milestone is**, and what is blocking it, including anything
+  waiting on a person rather than on code.
+
+If the item has no checkboxes, say so and summarise in prose instead of inventing a
+denominator. A made-up percentage is worse than no number.
+
 ## Before claiming it's done
 
 - Run the project's checks and **quote the actual output**. Paraphrase is not evidence.
