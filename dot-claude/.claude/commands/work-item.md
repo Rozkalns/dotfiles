@@ -13,6 +13,38 @@ If nothing was named, ask which one — do not pick.
    If it sits in `docs/backlog/`, the `backlog` skill owns that format — its conventions,
    its status line, its wrap-up. Follow them rather than inventing a parallel set, and
    expect to hand back to it when the turn ends.
+
+   **Check the size first, and take the second route only if it is genuinely large.**
+   `wc -c` the file. Under ~40 KB — which is almost every item — read it whole and move
+   on; the rest of this step does not apply. A long-running feature item can reach ten or
+   twenty times that, and re-reading a quarter of a megabyte to change one phase is worth
+   avoiding. Above the threshold:
+
+   - **Get the skeleton, not a sample.** Headings, the checkbox lines, and per-section
+     sizes:
+     `grep -n '^#\{1,4\} \|^- \[[ x]\]' FILE` and
+     `awk '/^## /{if(s)printf "%-50s %6d B\n",s,b; s=substr($0,4); b=0} {b+=length($0)+1} END{printf "%-50s %6d B\n",s,b}' FILE`
+   - **Always read these in full, whatever you are working on:** the title and status
+     line, and any "where the work lives" / "read this first" block. That is where a big
+     item records which branch holds what, and what is blocked on a person.
+   - **Then read, in full, only the sections your work touches.** In full is the point —
+     a half-read section is worse than an unread one, because you inherit its first claim
+     without the correction three paragraphs later.
+   - **Hunt the corrections before trusting anything.** A big item talks back to itself
+     across sections, and the stale claim is rarely next to the thing it describes.
+     `grep -in 'corrected\|superseded\|disproved\|was wrong\|no longer\|stale\|believe the code' FILE`
+     and read every hit that touches your scope, wherever it sits.
+   - **Say what you skipped** in the restate step below — "read X, Y, Z; did not read the
+     legal frame or the data model". A wrong scoping is then something the reader can
+     correct in one line, instead of a silent gap you act on.
+
+   Two failures this exists to prevent, both observed. A checkbox tally counted from a
+   partial read is confidently wrong, and it looks precise — recount from the file every
+   time rather than trusting the number in the status line, including your own from
+   earlier in the session. And a shared checkout moves: on a long turn, re-check
+   `git status -sb` and `git log --oneline -3` before reporting where anything stands,
+   because another session may have committed, switched branch, or grown the item under
+   you.
 2. **Restate the working context in under 10 bullets**: the goal, what's in scope, what proves it's done, the constraints, and anything the item records as already decided. Nothing else — no repo tour, no summary of things you haven't been asked about.
 3. **Name the deliverable in one sentence** — the PR title, the document produced, or the output expected.
 4. **State the smallest viable plan for the first phase only.**
