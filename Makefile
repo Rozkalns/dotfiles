@@ -8,6 +8,10 @@ else
 	OS := linux
 endif
 
+# stow with .DS_Store ignored (--ignore is additive to stow's built-in defaults,
+# unlike a .stow-local-ignore file which would replace them)
+STOW := stow --ignore='\.DS_Store'
+
 # Default target
 all: $(OS)
 
@@ -47,15 +51,15 @@ core:
 link:
 	@echo "==> Creating symbolic links with stow..."
 	@command -v stow >/dev/null 2>&1 || { echo "❌ stow not installed. Run 'brew install stow' first."; exit 1; }
-	@stow -t "$$HOME" runcom
-	@stow -t "$$HOME" vim
-	@stow -t "$$HOME" zsh.d
-	@stow -t "$$HOME" dot-claude
+	@$(STOW) -t "$$HOME" runcom
+	@$(STOW) -t "$$HOME" vim
+	@$(STOW) -t "$$HOME" zsh.d
+	@$(STOW) -t "$$HOME" dot-claude
 	@if [ ! -f "$$HOME/.claude/settings.local.json" ] && [ -f "$$HOME/.claude/settings.local.json.example" ]; then \
 		cp "$$HOME/.claude/settings.local.json.example" "$$HOME/.claude/settings.local.json"; \
 		echo "  Created ~/.claude/settings.local.json from example (edit for this machine)"; \
 	fi
-	@stow -t "$$HOME/.config" config
+	@$(STOW) -t "$$HOME/.config" config
 	@echo "✅ Symlinks created"
 
 # Install git hooks into whichever directory git actually reads.
@@ -169,11 +173,11 @@ update:
 # Uninstall symlinks
 unlink:
 	@echo "==> Removing symbolic links..."
-	@stow -t "$$HOME" -D runcom || true
-	@stow -t "$$HOME" -D vim || true
-	@stow -t "$$HOME" -D zsh.d || true
-	@stow -t "$$HOME" -D dot-claude || true
-	@stow -t "$$HOME/.config" -D config || true
+	@$(STOW) -t "$$HOME" -D runcom || true
+	@$(STOW) -t "$$HOME" -D vim || true
+	@$(STOW) -t "$$HOME" -D zsh.d || true
+	@$(STOW) -t "$$HOME" -D dot-claude || true
+	@$(STOW) -t "$$HOME/.config" -D config || true
 	@echo "✅ Symlinks removed"
 
 # Test installation
