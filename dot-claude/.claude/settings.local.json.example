@@ -1,6 +1,18 @@
 {
+  "_comment": "Template for ~/.claude/settings.local.json (gitignored, per-machine). Put private / work-only plugins and their marketplaces here, NOT in the public settings.json. NB: a local enabledPlugins block is only honored when settings.json also has an enabledPlugins key (Claude Code issue #27247), so keep that key present in settings.json.",
+  "env": {
+    "EXAMPLE_MACHINE_VAR": "1"
+  },
   "enabledPlugins": {
     "atlassian@claude-plugins-official": true,
-    "mapon-work-items@mapon-claude-plugins": true
+    "your-private-plugin@your-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "your-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "you/your-marketplace"
+      }
+    }
   }
 }
