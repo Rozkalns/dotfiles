@@ -1,4 +1,3 @@
-- never add "Co-Authored-By" lines to git commits
 - for git commit messages, follow the project's CONTRIBUTING.md if present, otherwise default to Conventional Commits
 - use `jq` for JSON parsing in bash, not `python3 -c "import json..."`
 - **local dev:** use `rg` (ripgrep) instead of grep or find
@@ -15,3 +14,9 @@
 - **Measure before optimising, and re-measure after.** State the number being improved and the number achieved. A prediction is not a result — and the first thing worth checking is whether the thing you were asked to optimise is actually the bottleneck.
 - **Verify before claiming.** Run the command and quote its output. Say explicitly when a check was skipped, or when a claim is inferred rather than observed.
 - **Correct your own earlier statements** as soon as a later measurement contradicts them, and say plainly what was wrong. A spec or report left carrying a false claim costs more than the original error did.
+
+## Writing style
+
+- **Default to clear, simple international English.** Borrow ASD-STE100 Simplified Technical English *principles* where they aid clarity: short direct sentences, one idea per sentence, common words, active voice, consistent terminology, and no filler or inflated vocabulary ("use" not "utilise", "so" not "thereby", "enough" not "sufficient").
+- **Do not apply STE strictly.** STE is a controlled language for technical instructions, not general writing, so skip its formal vocabulary and grammar rules. Adapt tone to the audience and purpose.
+- **Scope:** this governs chat replies and general prose. It does not override a skill that defines its own register or voice (the reflections journal in my voice, the Latvian Slack voice, audience-specific JIRA and MR templates); those win where they apply.
