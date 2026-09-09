@@ -39,7 +39,9 @@
     "playwright@claude-plugins-official": true,
     "php-lsp@claude-plugins-official": true,
     "vault-brain@claude-vault-brain": true,
-    "phpstorm-plugin@phpstorm-marketplace": true
+    "phpstorm-plugin@phpstorm-marketplace": true,
+    "reflections@claude-reflections": true,
+    "ros7skill@claude-ros7-skill": true
   },
   "extraKnownMarketplaces": {
     "diagram-design": {
@@ -71,11 +73,17 @@
         "source": "github",
         "repo": "jetbrains/phpstorm-claude-marketplace"
       }
+    },
+    "claude-reflections": {
+      "source": {
+        "source": "github",
+        "repo": "Rozkalns/claude-reflections"
+      }
     }
   },
+  "feedbackDrafts": "off",
   "effortLevel": "high",
   "tui": "fullscreen",
   "theme": "dark",
-  "skipAutoPermissionPrompt": true,
-  "feedbackDrafts": "off"
+  "skipAutoPermissionPrompt": true
 }
