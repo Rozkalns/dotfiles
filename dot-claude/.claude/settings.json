@@ -1,8 +1,6 @@
 {
   "env": {
-    "DISABLE_AUTOUPDATER": "1",
-    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
-    "MAX_THINKING_TOKENS": "128000"
+    "DISABLE_AUTOUPDATER": "1"
   },
   "model": "opus",
   "hooks": {
@@ -82,7 +80,7 @@
     }
   },
   "feedbackDrafts": "off",
-  "effortLevel": "high",
+  "showThinkingSummaries": true,
   "tui": "fullscreen",
   "theme": "dark",
   "skipAutoPermissionPrompt": true
