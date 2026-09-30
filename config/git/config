@@ -101,8 +101,7 @@
 	# Fuzzy branch switching (requires fzf)
 	fsw = "!git branch -a | fzf | xargs git switch"
 
-	# Clean up merged branches
-	cleanup = "!git branch --merged | grep -v '\\*\\|main\\|master' | xargs -n 1 git branch -d"
+	# Clean up merged branches: `git prune-merged` (bin/git-prune-merged, handles squash merges)
 
 [color]
 	ui = auto
