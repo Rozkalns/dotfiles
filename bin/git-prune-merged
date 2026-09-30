@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
 # Delete local branches whose work is already in the default branch.
-# Handles squash-merged GitLab MRs, which `git branch --merged` cannot see.
+# Handles squash-merged GitLab MRs and GitHub PRs, which `git branch --merged` cannot see.
+# The forge is picked from the origin URL: GitHub via `gh`, GitLab via `glab` (both need jq).
 #
 # Usage: git prune-merged [-n] [-y] [--closed]
 #   -n, --dry-run   only print the plan
 #   -y, --yes       delete without asking
-#   --closed        also delete branches whose MR was closed without merge
+#   --closed        also delete branches whose MR/PR was closed without merge
 #
 # A branch is deleted when one of these is true:
 #   merged      its tip is an ancestor of origin/<default>
 #   in-base     merging it into origin/<default> changes nothing
-#   mr-merged   its GitLab MR is merged and the local tip has no commits after the MR head
-#   mr-closed   its GitLab MR is closed (only with --closed)
+#   mr-merged   its MR/PR is merged and the local tip has no commits after the MR/PR head
+#   mr-closed   its MR/PR is closed (only with --closed)
 # Never touched: the default branch, the current branch, branches checked out in a worktree.
 # Every deleted branch is written as "<sha> <name>" to
 # ~/.local/share/git-branch-backups/<repo>-<date>.txt – restore with `git branch <name> <sha>`.
@@ -28,7 +29,7 @@ for arg in "$@"; do
     -n|--dry-run) dry_run=1 ;;
     -y|--yes) assume_yes=1 ;;
     --closed) include_closed=1 ;;
-    -h|--help) sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -45,21 +46,41 @@ base_tree=$(git rev-parse "$base^{tree}")
 current_branch=$(git branch --show-current)
 worktree_branches=$(git worktree list --porcelain | sed -n 's#^branch refs/heads/##p')
 
-use_gitlab=0
-if command -v glab >/dev/null && command -v jq >/dev/null && glab auth status >/dev/null 2>&1; then
-  use_gitlab=1
+# Accepts git@host:owner/repo.git, ssh://git@host/owner/repo and https://host/owner/repo.
+origin_url=$(git remote get-url origin)
+origin_host=$(printf '%s' "$origin_url" | sed -E 's#^[a-z+]+://##; s#^[^@/]*@##; s#[:/].*$##')
+origin_path=$(printf '%s' "$origin_url" | sed -E 's#^[a-z+]+://[^/]+/##; s#^[^@]*@[^:]*:##; s#\.git$##')
+
+forge=""
+if ! command -v jq >/dev/null; then
+  echo "jq not available – skipping the MR/PR check (squash merges will be kept)." >&2
+elif command -v gh >/dev/null && gh auth status --hostname "$origin_host" >/dev/null 2>&1; then
+  forge="github"
+elif command -v glab >/dev/null && glab auth status --hostname "$origin_host" >/dev/null 2>&1; then
+  forge="gitlab"
 else
-  echo "glab or jq not available – skipping the GitLab MR check (squash merges will be kept)." >&2
+  echo "No logged-in gh or glab for $origin_host – skipping the MR/PR check (squash merges will be kept)." >&2
 fi
 
-# Prints the merged MR head SHA, "closed", or nothing.
-gitlab_mr_state() {
-  local encoded mrs
-  encoded=$(printf '%s' "$1" | jq -sRr @uri)
-  mrs=$(glab api "projects/:id/merge_requests?source_branch=$encoded&state=all&per_page=20" 2>/dev/null) || return 0
-  printf '%s' "$mrs" | jq -r '
-    (map(select(.state == "merged")) | first | .sha) //
-    (if length > 0 and all(.state == "closed") then "closed" else empty end)'
+# Prints the merged MR/PR head SHA, "closed", or nothing.
+mr_state() {
+  local encoded response
+  case "$forge" in
+    github)
+      response=$(gh pr list --repo "$origin_host/$origin_path" --head "$1" --state all --limit 20 \
+        --json state,headRefOid 2>/dev/null) || return 0
+      printf '%s' "$response" | jq -r '
+        (map(select(.state == "MERGED")) | first | .headRefOid) //
+        (if length > 0 and all(.state == "CLOSED") then "closed" else empty end)'
+      ;;
+    gitlab)
+      encoded=$(printf '%s' "$1" | jq -sRr @uri)
+      response=$(glab api "projects/:id/merge_requests?source_branch=$encoded&state=all&per_page=20" 2>/dev/null) || return 0
+      printf '%s' "$response" | jq -r '
+        (map(select(.state == "merged")) | first | .sha) //
+        (if length > 0 and all(.state == "closed") then "closed" else empty end)'
+      ;;
+  esac
 }
 
 delete_names=()
@@ -78,8 +99,8 @@ while IFS= read -r branch; do
     reason="merged"
   elif [ "$(git merge-tree --write-tree "$base" "$branch" 2>/dev/null | head -1)" = "$base_tree" ]; then
     reason="in-base"
-  elif [ "$use_gitlab" -eq 1 ]; then
-    state=$(gitlab_mr_state "$branch")
+  elif [ -n "$forge" ]; then
+    state=$(mr_state "$branch")
     if [ "$state" = "closed" ]; then
       [ "$include_closed" -eq 1 ] && reason="mr-closed"
     elif [ -n "$state" ]; then
@@ -87,7 +108,7 @@ while IFS= read -r branch; do
       if git merge-base --is-ancestor "$branch" "$state" 2>/dev/null; then
         reason="mr-merged"
       else
-        echo "keep  $branch – MR merged, but local branch has commits after the MR head" >&2
+        echo "keep  $branch – MR/PR merged, but local branch has commits after the MR/PR head" >&2
       fi
     fi
   fi
