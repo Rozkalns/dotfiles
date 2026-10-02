@@ -4,17 +4,24 @@
 # Handles squash-merged GitLab MRs and GitHub PRs, which `git branch --merged` cannot see.
 # The forge is picked from the origin URL: GitHub via `gh`, GitLab via `glab` (both need jq).
 #
-# Usage: git prune-merged [-n] [-y] [--closed]
+# Usage: git prune-merged [-n] [-y] [-w] [--closed] [-h]
 #   -n, --dry-run   only print the plan
 #   -y, --yes       delete without asking
+#   -w, --worktrees also remove linked worktrees whose branch would be deleted
 #   --closed        also delete branches whose MR/PR was closed without merge
+#   -h              show this help (`git prune-merged --help` is taken by git, which looks
+#                   for a man page that does not exist)
+#   Short flags can be combined: -nw is -n -w.
 #
 # A branch is deleted when one of these is true:
 #   merged      its tip is an ancestor of origin/<default>
 #   in-base     merging it into origin/<default> changes nothing
 #   mr-merged   its MR/PR is merged and the local tip has no commits after the MR/PR head
 #   mr-closed   its MR/PR is closed (only with --closed)
-# Never touched: the default branch, the current branch, branches checked out in a worktree.
+# Never touched: the default branch, the current branch, the main worktree's branch.
+# A branch checked out in a linked worktree is only listed, unless -w is given. With -w its
+# worktree is removed first, but only when it is unlocked and has no changes or untracked
+# files. Ignored files in it (.env, vendor/, node_modules/) are deleted with it.
 # Every deleted branch is written as "<sha> <name>" to
 # ~/.local/share/git-branch-backups/<repo>-<date>.txt – restore with `git branch <name> <sha>`.
 
@@ -23,13 +30,24 @@ set -euo pipefail
 dry_run=0
 assume_yes=0
 include_closed=0
+include_worktrees=0
 
+# Split bundled short flags: -nw becomes -n -w.
+args=()
 for arg in "$@"; do
+  case "$arg" in
+    -[!-]?*) for ((i = 1; i < ${#arg}; i++)); do args+=("-${arg:i:1}"); done ;;
+    *) args+=("$arg") ;;
+  esac
+done
+
+for arg in ${args[@]+"${args[@]}"}; do
   case "$arg" in
     -n|--dry-run) dry_run=1 ;;
     -y|--yes) assume_yes=1 ;;
+    -w|--worktrees) include_worktrees=1 ;;
     --closed) include_closed=1 ;;
-    -h|--help) sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -44,7 +62,20 @@ default_branch=${default_branch:-master}
 base="origin/$default_branch"
 base_tree=$(git rev-parse "$base^{tree}")
 current_branch=$(git branch --show-current)
-worktree_branches=$(git worktree list --porcelain | sed -n 's#^branch refs/heads/##p')
+
+# One "<branch>\t<path>\t<main|linked>\t<locked|->" line per worktree with a branch checked out.
+# The first entry of `git worktree list` is always the main worktree.
+worktrees=$(git worktree list --porcelain | awk '
+  /^worktree / { path = substr($0, 10); n++; branch = ""; locked = "-" }
+  /^branch refs\/heads\// { branch = substr($0, 19) }
+  /^locked/ { locked = "locked" }
+  /^$/ { if (branch != "") print branch "\t" path "\t" (n == 1 ? "main" : "linked") "\t" locked; branch = "" }
+  END { if (branch != "") print branch "\t" path "\t" (n == 1 ? "main" : "linked") "\t" locked }')
+
+# Prints the worktree line for a branch, or nothing.
+worktree_of() {
+  printf '%s\n' "$worktrees" | awk -F '\t' -v b="$1" '$1 == b { print; exit }'
+}
 
 # Accepts git@host:owner/repo.git, ssh://git@host/owner/repo and https://host/owner/repo.
 origin_url=$(git remote get-url origin)
@@ -85,13 +116,19 @@ mr_state() {
 
 delete_names=()
 delete_reasons=()
+delete_paths=()
 kept=0
+listed=""
 
 while IFS= read -r branch; do
   [ "$branch" = "$default_branch" ] && continue
   [ "$branch" = "$current_branch" ] && continue
-  if printf '%s\n' "$worktree_branches" | grep -qxF -- "$branch"; then
-    continue
+
+  wt_path=""
+  wt=$(worktree_of "$branch")
+  if [ -n "$wt" ]; then
+    IFS=$'\t' read -r _ wt_path wt_kind wt_locked <<< "$wt"
+    [ "$wt_kind" = "main" ] && continue
   fi
 
   reason=""
@@ -113,25 +150,47 @@ while IFS= read -r branch; do
     fi
   fi
 
+  if [ -n "$reason" ] && [ -n "$wt_path" ]; then
+    if [ "$include_worktrees" -ne 1 ]; then
+      echo "list  $branch – $reason, checked out in worktree $wt_path (use -w to remove it)" >&2
+      listed=$((${listed:-0} + 1))
+      reason=""
+    elif [ "$wt_locked" = "locked" ]; then
+      echo "keep  $branch – $reason, but worktree $wt_path is locked" >&2
+      reason=""
+    elif [ ! -d "$wt_path" ]; then
+      echo "keep  $branch – $reason, but worktree $wt_path is missing (run git worktree prune)" >&2
+      reason=""
+    elif [ -n "$(git -C "$wt_path" status --porcelain 2>/dev/null)" ]; then
+      echo "keep  $branch – $reason, but worktree $wt_path has changes or untracked files" >&2
+      reason=""
+    fi
+  fi
+
   if [ -n "$reason" ]; then
     delete_names+=("$branch")
     delete_reasons+=("$reason")
+    delete_paths+=("$wt_path")
   else
     kept=$((kept + 1))
   fi
 done < <(git for-each-ref --format='%(refname:short)' refs/heads)
 
 if [ ${#delete_names[@]} -eq 0 ]; then
-  echo "Nothing to delete. $kept branch(es) kept."
+  echo "Nothing to delete. $kept branch(es) kept${listed:+, $listed of them in worktrees (use -w)}."
   exit 0
 fi
 
 echo
 for i in "${!delete_names[@]}"; do
-  printf '  %-10s %s\n' "${delete_reasons[$i]}" "${delete_names[$i]}"
+  if [ -n "${delete_paths[$i]}" ]; then
+    printf '  %-10s %s  (+ worktree %s)\n' "${delete_reasons[$i]}" "${delete_names[$i]}" "${delete_paths[$i]}"
+  else
+    printf '  %-10s %s\n' "${delete_reasons[$i]}" "${delete_names[$i]}"
+  fi
 done
 echo
-echo "${#delete_names[@]} branch(es) to delete, $kept kept."
+echo "${#delete_names[@]} branch(es) to delete, $kept kept${listed:+, $listed of them in worktrees (use -w)}."
 
 [ "$dry_run" -eq 1 ] && exit 0
 
@@ -143,12 +202,32 @@ if [ "$assume_yes" -ne 1 ]; then
   esac
 fi
 
+# A worktree that git refuses to remove keeps its branch: `git branch -D` would fail on it anyway.
+branches=()
+for i in "${!delete_names[@]}"; do
+  if [ -n "${delete_paths[$i]}" ]; then
+    if git worktree remove "${delete_paths[$i]}"; then
+      echo "Removed worktree ${delete_paths[$i]}"
+    else
+      echo "keep  ${delete_names[$i]} – could not remove worktree ${delete_paths[$i]}" >&2
+      continue
+    fi
+  fi
+  branches+=("${delete_names[$i]}")
+done
+
+if [ ${#branches[@]} -eq 0 ]; then
+  echo "Nothing deleted."
+  exit 1
+fi
+
+# The main worktree's name, so a run from a linked worktree writes to the same backup file.
 backup_dir="$HOME/.local/share/git-branch-backups"
-backup_file="$backup_dir/$(basename "$(git rev-parse --show-toplevel)")-$(date +%F).txt"
+backup_file="$backup_dir/$(basename "$(git worktree list --porcelain | sed -n '1s#^worktree ##p')")-$(date +%F).txt"
 mkdir -p "$backup_dir"
-for branch in "${delete_names[@]}"; do
+for branch in "${branches[@]}"; do
   printf '%s %s\n' "$(git rev-parse "$branch")" "$branch"
 done >> "$backup_file"
 
-git branch -D --quiet "${delete_names[@]}"
-echo "Deleted ${#delete_names[@]} branch(es). SHAs saved to $backup_file"
+git branch -D --quiet "${branches[@]}"
+echo "Deleted ${#branches[@]} branch(es). SHAs saved to $backup_file"
