@@ -4,10 +4,11 @@
 # Handles squash-merged GitLab MRs and GitHub PRs, which `git branch --merged` cannot see.
 # The forge is picked from the origin URL: GitHub via `gh`, GitLab via `glab` (both need jq).
 #
-# Usage: git prune-merged [-n] [-y] [-w] [--closed] [-h]
+# Usage: git prune-merged [-n] [-y] [-w] [-s] [--closed] [-h]
 #   -n, --dry-run   only print the plan
 #   -y, --yes       delete without asking
 #   -w, --worktrees also remove linked worktrees whose branch would be deleted
+#   -s, --stashes   also drop stashes whose changes are already in the default branch
 #   --closed        also delete branches whose MR/PR was closed without merge
 #   -h              show this help (`git prune-merged --help` is taken by git, which looks
 #                   for a man page that does not exist)
@@ -22,8 +23,14 @@
 # A branch checked out in a linked worktree is only listed, unless -w is given. With -w its
 # worktree is removed first, but only when it is unlocked and has no changes or untracked
 # files. Ignored files in it (.env, vendor/, node_modules/) are deleted with it.
+# A stash is dropped when applying it changes nothing:
+#   in-base     on origin/<default> as it is now
+#   landed      on some commit of origin/<default> since the stash was made (main moved on after)
+# Untracked files in a stash must exist with the same content. Any other stash is kept; when
+# some of its files landed, the commit and the files that differ are shown, to decide by hand.
 # Every deleted branch is written as "<sha> <name>" to
 # ~/.local/share/git-branch-backups/<repo>-<date>.txt – restore with `git branch <name> <sha>`.
+# Dropped stashes go there as "<sha> stash <message>" – restore with `git stash store -m <message> <sha>`.
 
 set -euo pipefail
 
@@ -31,6 +38,7 @@ dry_run=0
 assume_yes=0
 include_closed=0
 include_worktrees=0
+include_stashes=0
 
 # Split bundled short flags: -nw becomes -n -w.
 args=()
@@ -46,8 +54,9 @@ for arg in ${args[@]+"${args[@]}"}; do
     -n|--dry-run) dry_run=1 ;;
     -y|--yes) assume_yes=1 ;;
     -w|--worktrees) include_worktrees=1 ;;
+    -s|--stashes) include_stashes=1 ;;
     --closed) include_closed=1 ;;
-    -h|--help) sed -n '3,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -176,8 +185,82 @@ while IFS= read -r branch; do
   fi
 done < <(git for-each-ref --format='%(refname:short)' refs/heads)
 
-if [ ${#delete_names[@]} -eq 0 ]; then
-  echo "Nothing to delete. $kept branch(es) kept${listed:+, $listed of them in worktrees (use -w)}."
+# True when applying stash $1 (made on $2) to commit $3 changes nothing, untracked files included.
+stash_contained() {
+  local result untracked_meta untracked_file
+  result=$(git merge-tree --write-tree --merge-base "$2" "$3" "$1" 2>/dev/null | head -1) || return 1
+  [ "$result" = "$(git rev-parse "$3^{tree}")" ] || return 1
+  git rev-parse -q --verify "$1^3" >/dev/null || return 0
+  while IFS=$'\t' read -r untracked_meta untracked_file; do
+    [ "$(git rev-parse -q --verify "$3:$untracked_file" 2>/dev/null)" = "${untracked_meta##* }" ] || return 1
+  done < <(git ls-tree -r "$1^3")
+}
+
+stash_shas=()
+stash_reasons=()
+stash_subjects=()
+stashes_kept=0
+
+if [ "$include_stashes" -eq 1 ]; then
+  while IFS=' ' read -r stash_sha stash_subject; do
+    stash_base=$(git rev-parse "$stash_sha^1")
+    stash_files=$( { git diff --name-only "$stash_base" "$stash_sha"
+      if git rev-parse -q --verify "$stash_sha^3" >/dev/null; then git ls-tree -r --name-only "$stash_sha^3"; fi; } | sort -u)
+    scan_from=$(git merge-base "$stash_base" "$base" 2>/dev/null || true)
+
+    reason=""
+    if stash_contained "$stash_sha" "$stash_base" "$base"; then
+      reason="in-base"
+    elif [ -n "$scan_from" ] && [ -n "$stash_files" ]; then
+      # Only commits touching the stash's files can change the answer.
+      while IFS= read -r commit; do
+        if stash_contained "$stash_sha" "$stash_base" "$commit"; then
+          reason="landed"
+          break
+        fi
+      done < <(printf '%s\n' "$stash_files" | tr '\n' '\0' | xargs -0 git rev-list --reverse --first-parent "$scan_from..$base" --)
+    fi
+
+    if [ -n "$reason" ]; then
+      stash_shas+=("$stash_sha")
+      stash_reasons+=("$reason")
+      stash_subjects+=("$stash_subject")
+      continue
+    fi
+    stashes_kept=$((stashes_kept + 1))
+
+    # Hint: the commit where most of the stash's files have the stash's exact content.
+    hint=""
+    best=0
+    total=$(printf '%s\n' "$stash_files" | grep -c . || true)
+    if [ -n "$scan_from" ] && [ "$total" -gt 0 ]; then
+      while IFS= read -r commit; do
+        matched=0
+        differs=()
+        while IFS= read -r stash_file; do
+          stash_blob=$(git rev-parse -q --verify "$stash_sha:$stash_file" 2>/dev/null ||
+            git rev-parse -q --verify "$stash_sha^3:$stash_file" 2>/dev/null || true)
+          if [ "$(git rev-parse -q --verify "$commit:$stash_file" 2>/dev/null || true)" = "$stash_blob" ]; then
+            matched=$((matched + 1))
+          else
+            differs+=("$stash_file")
+          fi
+        done <<< "$stash_files"
+        if [ "$matched" -gt "$best" ]; then
+          best=$matched
+          hint="$matched/$total files landed in $(git rev-parse --short "$commit"); differs: ${differs[*]:-none}"
+        fi
+      done < <(printf '%s\n' "$stash_files" | tr '\n' '\0' | xargs -0 git rev-list --first-parent "$scan_from..$base" --)
+    fi
+    echo "keep  $(git rev-parse --short "$stash_sha") $stash_subject${hint:+ – $hint}" >&2
+  done < <(git stash list --format='%H %s')
+fi
+
+stash_note=""
+[ "$include_stashes" -eq 1 ] && stash_note=", $stashes_kept stash(es) kept"
+
+if [ ${#delete_names[@]} -eq 0 ] && [ ${#stash_shas[@]} -eq 0 ]; then
+  echo "Nothing to delete. $kept branch(es) kept${listed:+, $listed of them in worktrees (use -w)}${stash_note}."
   exit 0
 fi
 
@@ -189,8 +272,12 @@ for i in "${!delete_names[@]}"; do
     printf '  %-10s %s\n' "${delete_reasons[$i]}" "${delete_names[$i]}"
   fi
 done
+for i in "${!stash_shas[@]}"; do
+  printf '  %-10s stash %s %s\n' "${stash_reasons[$i]}" "$(git rev-parse --short "${stash_shas[$i]}")" "${stash_subjects[$i]}"
+done
 echo
 echo "${#delete_names[@]} branch(es) to delete, $kept kept${listed:+, $listed of them in worktrees (use -w)}."
+[ "$include_stashes" -eq 1 ] && echo "${#stash_shas[@]} stash(es) to drop, $stashes_kept kept."
 
 [ "$dry_run" -eq 1 ] && exit 0
 
@@ -216,7 +303,7 @@ for i in "${!delete_names[@]}"; do
   branches+=("${delete_names[$i]}")
 done
 
-if [ ${#branches[@]} -eq 0 ]; then
+if [ ${#branches[@]} -eq 0 ] && [ ${#stash_shas[@]} -eq 0 ]; then
   echo "Nothing deleted."
   exit 1
 fi
@@ -225,9 +312,26 @@ fi
 backup_dir="$HOME/.local/share/git-branch-backups"
 backup_file="$backup_dir/$(basename "$(git worktree list --porcelain | sed -n '1s#^worktree ##p')")-$(date +%F).txt"
 mkdir -p "$backup_dir"
-for branch in "${branches[@]}"; do
-  printf '%s %s\n' "$(git rev-parse "$branch")" "$branch"
-done >> "$backup_file"
 
-git branch -D --quiet "${branches[@]}"
-echo "Deleted ${#branches[@]} branch(es). SHAs saved to $backup_file"
+if [ ${#branches[@]} -gt 0 ]; then
+  for branch in "${branches[@]}"; do
+    printf '%s %s\n' "$(git rev-parse "$branch")" "$branch"
+  done >> "$backup_file"
+
+  git branch -D --quiet "${branches[@]}"
+  echo "Deleted ${#branches[@]} branch(es). SHAs saved to $backup_file"
+fi
+
+# Dropped by SHA, highest index first, so an earlier drop never shifts a later stash@{n}.
+dropped=0
+if [ ${#stash_shas[@]} -gt 0 ]; then
+  while IFS=' ' read -r stash_ref stash_sha; do
+    for i in "${!stash_shas[@]}"; do
+      [ "$stash_sha" = "${stash_shas[$i]}" ] || continue
+      printf '%s stash %s\n' "$stash_sha" "${stash_subjects[$i]}" >> "$backup_file"
+      git stash drop --quiet "$stash_ref"
+      dropped=$((dropped + 1))
+    done
+  done < <(git stash list --format='%gd %H' | sort -t '{' -k2 -rn)
+  echo "Dropped $dropped stash(es). SHAs saved to $backup_file"
+fi
