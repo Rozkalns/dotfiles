@@ -19,6 +19,9 @@
 #   in-base     merging it into origin/<default> changes nothing
 #   mr-merged   its MR/PR is merged and the local tip has no commits after the MR/PR head
 #   mr-closed   its MR/PR is closed (only with --closed)
+# A branch kept because of its MR/PR (merged but with later commits, or closed without
+# --closed) is listed with those commits; one whose patch already landed under another SHA
+# is marked "same patch already in origin/<default>".
 # Never touched: the default branch, the current branch, the main worktree's branch.
 # A branch checked out in a linked worktree is only listed, unless -w is given. With -w its
 # worktree is removed first, but only when it is unlocked and has no changes or untracked
@@ -56,7 +59,7 @@ for arg in ${args[@]+"${args[@]}"}; do
     -w|--worktrees) include_worktrees=1 ;;
     -s|--stashes) include_stashes=1 ;;
     --closed) include_closed=1 ;;
-    -h|--help) sed -n '3,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -123,6 +126,19 @@ mr_state() {
   esac
 }
 
+# Prints the commits on branch $1 after $2 (default: the base), newest first, at most 10.
+# A commit whose patch is already in the base, under another SHA, is marked as such.
+list_commits() {
+  local listed
+  listed=$(git cherry -v "$base" "$1" ${2:+"$2"} 2>/dev/null | awk -v base="$base" '
+    { line = "        " substr($2, 1, 7) " " substr($0, index($0, $3)) }
+    $1 == "-" { line = line "  (same patch already in " base ")" }
+    { lines[NR] = line }
+    END { for (i = NR; i > 0 && i > NR - 10; i--) print lines[i]; if (NR > 10) print "        … and " NR - 10 " more" }')
+  [ -n "$listed" ] && printf '%s\n' "$listed" >&2
+  return 0
+}
+
 delete_names=()
 delete_reasons=()
 delete_paths=()
@@ -148,13 +164,19 @@ while IFS= read -r branch; do
   elif [ -n "$forge" ]; then
     state=$(mr_state "$branch")
     if [ "$state" = "closed" ]; then
-      [ "$include_closed" -eq 1 ] && reason="mr-closed"
+      if [ "$include_closed" -eq 1 ]; then
+        reason="mr-closed"
+      else
+        echo "keep  $branch – MR/PR closed without merge (use --closed to delete); not in $base:" >&2
+        list_commits "$branch"
+      fi
     elif [ -n "$state" ]; then
       git cat-file -e "$state^{commit}" 2>/dev/null || git fetch --quiet origin "$state" 2>/dev/null || true
       if git merge-base --is-ancestor "$branch" "$state" 2>/dev/null; then
         reason="mr-merged"
       else
-        echo "keep  $branch – MR/PR merged, but local branch has commits after the MR/PR head" >&2
+        echo "keep  $branch – MR/PR merged, but local branch has commits after the MR/PR head:" >&2
+        list_commits "$branch" "$state"
       fi
     fi
   fi
