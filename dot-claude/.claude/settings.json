@@ -1,8 +1,8 @@
 {
-  "env": {
-    "DISABLE_AUTOUPDATER": "1"
-  },
   "model": "opus",
+  "permissions": {
+    "defaultMode": "auto"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -28,12 +28,16 @@
     "type": "command",
     "command": "bash ~/.claude/statusline.sh"
   },
+  "skillOverrides": {
+    "reflections": "off",
+    "review-mr": "off"
+  },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": false,
     "plugin-dev@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": false,
+    "claude-md-management@claude-plugins-official": false,
+    "code-simplifier@claude-plugins-official": false,
     "playwright@claude-plugins-official": true,
     "php-lsp@claude-plugins-official": true,
     "vault-brain@claude-vault-brain": true,
@@ -52,7 +56,8 @@
       "source": {
         "source": "github",
         "repo": "MrOplus/claude-ros7-skill"
-      }
+      },
+      "autoUpdate": true
     },
     "xdebug-mcp": {
       "source": {
@@ -64,24 +69,27 @@
       "source": {
         "source": "github",
         "repo": "Rozkalns/claude-vault-brain"
-      }
+      },
+      "autoUpdate": true
     },
     "phpstorm-marketplace": {
       "source": {
         "source": "github",
         "repo": "jetbrains/phpstorm-claude-marketplace"
-      }
+      },
+      "autoUpdate": true
     },
     "claude-reflections": {
       "source": {
         "source": "github",
         "repo": "Rozkalns/claude-reflections"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "feedbackDrafts": "off",
-  "showThinkingSummaries": true,
   "tui": "fullscreen",
+  "showThinkingSummaries": true,
   "theme": "dark",
   "skipAutoPermissionPrompt": true
 }
