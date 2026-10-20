@@ -12,6 +12,7 @@
 	untrackedCache = true
 	pager = delta
 	ignorecase = false
+	hooksPath = ~/.dotfiles/config/git/hooks
 
 [pull]
 	rebase = true

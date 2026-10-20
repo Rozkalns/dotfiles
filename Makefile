@@ -68,14 +68,16 @@ link:
 # would be silently dead. The hooks self-limit to this repo; see scripts/hooks/.
 hooks:
 	@echo "==> Installing git hooks..."
-	@dest="$$(git -C "$(CURDIR)" config --get core.hooksPath)"; \
+	@dest="$$(git -C "$(CURDIR)" config --type=path --get core.hooksPath)"; \
 	 [ -n "$$dest" ] || dest="$(CURDIR)/.git/hooks"; \
 	 mkdir -p "$$dest"; \
 	 ln -sf "$(CURDIR)/scripts/hooks/post-merge" "$$dest/post-merge"; \
 	 ln -sf "$(CURDIR)/scripts/hooks/post-rewrite" "$$dest/post-rewrite"; \
+	 ln -sf "$(CURDIR)/scripts/hooks/pre-push" "$$dest/pre-push"; \
 	 if [ "$$dest" != "$(CURDIR)/.git/hooks" ]; then \
-	   rm -f "$(CURDIR)/.git/hooks/post-merge" "$(CURDIR)/.git/hooks/post-rewrite"; \
+	   rm -f "$(CURDIR)/.git/hooks/post-merge" "$(CURDIR)/.git/hooks/post-rewrite" "$(CURDIR)/.git/hooks/pre-push"; \
 	 fi; \
+	 [ -d "$$HOME/.config/leak-guard" ] || echo "⚠️  No ~/.config/leak-guard denylists – pre-push checks secret patterns only"; \
 	 echo "✅ Git hooks installed into $$dest"
 
 # Install Homebrew packages
