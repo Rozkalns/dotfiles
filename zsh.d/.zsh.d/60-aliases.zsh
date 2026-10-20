@@ -83,8 +83,8 @@ alias ....='cd ../../..'
 alias ~='cd ~'
 
 # Safety aliases (ask before overwrite)
-# Disable in non-interactive contexts like Claude Code (it sets CLAUDECODE, not NONINTERACTIVE)
-if [ -z "$NONINTERACTIVE" ] && [ -z "$CLAUDECODE" ]; then
+# Disable in AI agent shells like Claude Code
+if [ -z "$CLAUDECODE" ] && [ -z "$AI_AGENT" ]; then
     alias cp='cp -i'
     alias mv='mv -i'
     alias rm='rm -i'
