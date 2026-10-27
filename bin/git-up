@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+
+# Bring the current repo up to date without switching branches.
+#
+# Usage: git up [-h]
+#
+# 1. Fetch once from origin: the default branch, plus the current branch's upstream.
+# 2. Default branch: fast-forward the local copy to origin/<default>. It is never merged
+#    or rebased. Left as it is, with a note, when it has commits that are not on origin,
+#    or when it is checked out in another worktree with changes or not up to date there.
+# 3. Current branch, when it is not the default branch and has an upstream: bring in the
+#    upstream's new commits (for example a CI commit). Rebase when pull.rebase is true,
+#    merge otherwise. rebase.autoStash / merge.autoStash keep local changes.
+# 4. Submodules, chosen per repo with `git config up.submodules <mode>`:
+#      pinned   (default) the commit this repo records for each submodule
+#      remote   the latest commit of each submodule's remote branch
+#      none     leave submodules alone
+#    A submodule with a branch checked out is not detached: with `remote`, the branch it
+#    follows is fast-forwarded; any other branch (your own work) is skipped.
+# 5. Print how many commits the current branch is behind origin/<default>.
+#
+# The default branch comes from origin/HEAD (fix a missing one with
+# `git remote set-head origin --auto`), else master or main, whichever origin has.
+
+set -euo pipefail
+
+case "${1:-}" in
+  -h|--help) sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  "") ;;
+  *) echo "git up: unknown argument: $1 (try -h)" >&2; exit 2 ;;
+esac
+
+note() { printf '==> %s\n' "$*"; }
+warn() { printf '==> warning: %s\n' "$*" >&2; }
+
+git rev-parse --is-inside-work-tree >/dev/null
+cd "$(git rev-parse --show-toplevel)" # submodule paths in .gitmodules are relative to it
+git remote get-url origin >/dev/null 2>&1 || { echo "git up: no remote named origin" >&2; exit 1; }
+
+default_branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
+if [ -z "$default_branch" ]; then
+  if git show-ref --verify --quiet refs/remotes/origin/main; then default_branch=main; else default_branch=master; fi
+fi
+base="origin/$default_branch"
+current=$(git branch --show-current)
+
+# --- 1. one fetch -------------------------------------------------------------------------
+refs=("$default_branch")
+upstream=""
+if [ -n "$current" ] && [ "$current" != "$default_branch" ] \
+   && upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null); then
+  upstream_remote=$(git config "branch.$current.remote")
+  upstream_ref=$(git config "branch.$current.merge")
+  if [ "$upstream_remote" = origin ]; then
+    refs+=("${upstream_ref#refs/heads/}")
+  else
+    git fetch --quiet "$upstream_remote" "${upstream_ref#refs/heads/}"
+  fi
+fi
+git fetch --quiet origin "${refs[@]}"
+
+# --- 2. default branch --------------------------------------------------------------------
+# Prints the path of another worktree that has branch $1 checked out, if any.
+other_worktree_with() {
+  local here wt="" line
+  here=$(git rev-parse --show-toplevel)
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt=${line#worktree } ;;
+      "branch refs/heads/$1") [ "$wt" != "$here" ] && { echo "$wt"; return; } ;;
+    esac
+  done < <(git worktree list --porcelain)
+}
+
+if ! git show-ref --verify --quiet "refs/heads/$default_branch"; then
+  : # no local copy of the default branch; nothing to update
+elif [ "$(git rev-parse "$default_branch")" = "$(git rev-parse "$base")" ]; then
+  : # already up to date
+elif ! git merge-base --is-ancestor "$default_branch" "$base"; then
+  warn "$default_branch has commits that are not on $base; left as it is"
+elif [ "$current" = "$default_branch" ]; then
+  git merge --ff-only --quiet "$base"
+  note "$default_branch: fast-forwarded to $base"
+elif wt=$(other_worktree_with "$default_branch") && [ -n "$wt" ]; then
+  if [ -z "$(git -C "$wt" status --porcelain --untracked-files=no)" ]; then
+    git -C "$wt" merge --ff-only --quiet "$base"
+    note "$default_branch: fast-forwarded to $base (checked out in $wt)"
+  else
+    warn "$default_branch is checked out with changes in $wt; left as it is"
+  fi
+else
+  old=$(git rev-parse "$default_branch")
+  git update-ref -m "git up: fast-forward to $base" "refs/heads/$default_branch" "$base" "$old"
+  note "$default_branch: fast-forwarded to $base"
+fi
+
+# --- 3. current branch from its upstream --------------------------------------------------
+if [ -z "$current" ]; then
+  note "detached HEAD; no branch to update"
+elif [ -n "$upstream" ] && ! git merge-base --is-ancestor "$upstream" HEAD; then
+  if [ "$(git config --bool pull.rebase || true)" = true ]; then
+    git rebase --quiet "$upstream"
+    note "$current: rebased onto $upstream"
+  else
+    git merge --quiet "$upstream"
+    note "$current: merged $upstream"
+  fi
+fi
+
+# --- 4. submodules ------------------------------------------------------------------------
+if [ -f .gitmodules ]; then
+  mode=$(git config up.submodules || echo pinned)
+  case "$mode" in
+    none) ;;
+    pinned|remote)
+      paths=()
+      while read -r key path; do
+        name=${key#submodule.}; name=${name%.path}
+        if [ -e "$path/.git" ] && sm_branch=$(git -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null); then
+          # The branch `--remote` follows: .gitmodules, else the submodule's origin/HEAD.
+          tracked=$(git config --file .gitmodules "submodule.$name.branch" \
+            || git -C "$path" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' \
+            || true)
+          if [ "$mode" = remote ] && [ "$sm_branch" = "$tracked" ]; then
+            if git -C "$path" fetch --quiet origin "$tracked" \
+               && git -C "$path" merge --ff-only --quiet "origin/$tracked" 2>/dev/null; then
+              note "submodule $path: $tracked fast-forwarded"
+            else
+              warn "submodule $path: $tracked cannot fast-forward to origin/$tracked; left as it is"
+            fi
+          else
+            note "submodule $path: on branch $sm_branch; skipped"
+          fi
+        else
+          paths+=("$path")
+        fi
+      done < <(git config --file .gitmodules --get-regexp '^submodule\..*\.path$')
+      if [ ${#paths[@]} -gt 0 ]; then
+        flags=(--init)
+        [ "$mode" = remote ] && flags+=(--remote)
+        git submodule --quiet update "${flags[@]}" -- "${paths[@]}"
+        note "submodules: ${#paths[@]} updated ($mode)"
+      fi
+      ;;
+    *) warn "unknown up.submodules value '$mode' (use pinned, remote or none); submodules skipped" ;;
+  esac
+fi
+
+# --- 5. report ----------------------------------------------------------------------------
+note "behind $base: $(git rev-list --count "HEAD..$base")"

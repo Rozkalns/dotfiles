@@ -154,6 +154,8 @@ Run `make migrate` before `make link`: until the migration has run, stow stops w
 
 The migration moves an old `~/.gitconfig` to `~/.gitconfig.bak-<timestamp>` and copies its name and email to `~/.config/git-private/user`. It also moves an old `~/.config/git` folder to `~/.config/git.bak-<timestamp>` and links `~/.config/git` the way stow does.
 
+`git up` (`bin/git-up`) brings a repo up to date without switching branches: it fast-forwards the default branch (also when another worktree has it checked out), pulls the current branch's upstream, updates submodules, and prints how far behind the default branch you are. Submodules use the pinned commits unless a repo sets `git config up.submodules remote` (or `none`). `git up -h` explains the details.
+
 Check which file a setting comes from:
 ```bash
 git config --show-origin --get user.email
