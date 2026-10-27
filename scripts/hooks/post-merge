@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Runs after every `git pull` — re-applies symlinks and runs pending migrations.
+# Runs after every `git pull` — runs pending migrations, then re-applies symlinks.
+# Migrations go first: they clear up old setups that would make stow stop with a
+# conflict, and a failed `make link` must not keep them from running.
 #
 # Installed into core.hooksPath, which is global, so this fires on a pull in ANY
 # repo. Resolve our own real path back to the dotfiles checkout we were installed
@@ -8,4 +10,6 @@ self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
 origin_repo="${self%/scripts/hooks/*}"
 [ "$(git rev-parse --show-toplevel 2>/dev/null)" = "$origin_repo" ] || exit 0
 
-cd "$origin_repo" && make link && make migrate
+cd "$origin_repo" || exit 0
+make migrate
+make link

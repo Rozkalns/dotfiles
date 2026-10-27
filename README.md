@@ -147,10 +147,12 @@ make link && make git-setup
 
 **Existing machine** (set up before the single-file change):
 ```bash
-make sync && make migrate    # run `make git-setup` too if the migration asks for it
+git pull && make migrate && make link && make hooks    # run `make git-setup` too if the migration asks for it
 ```
 
-The migration moves an old `~/.gitconfig` to `~/.gitconfig.bak-<timestamp>` and copies its name and email to `~/.config/git-private/user`. It also replaces copied files in `~/.config/git/` with links.
+Run `make migrate` before `make link`: until the migration has run, stow stops with "existing target is not owned by stow: git".
+
+The migration moves an old `~/.gitconfig` to `~/.gitconfig.bak-<timestamp>` and copies its name and email to `~/.config/git-private/user`. It also moves an old `~/.config/git` folder to `~/.config/git.bak-<timestamp>` and links `~/.config/git` the way stow does.
 
 Check which file a setting comes from:
 ```bash

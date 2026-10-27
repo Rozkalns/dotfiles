@@ -5,18 +5,19 @@
 # setups break that:
 # - ~/.gitconfig: git reads it last, so it overrides the dotfiles config. It is
 #   moved to ~/.gitconfig.bak-<timestamp>.
-# - ~/.config/git/config or ignore as a plain file (a copy, not a link): the
-#   copy goes stale and `make link` stops with a conflict. It is moved aside
-#   and replaced with a link.
+# - ~/.config/git as anything other than the relative link stow makes (a copied
+#   folder, or an absolute link): the copy goes stale, and `make link` stops with
+#   "existing target is not owned by stow". A folder is moved to
+#   ~/.config/git.bak-<timestamp>, then the link is made the way stow makes it.
 #
 # The identity now lives in ~/.config/git-private/user. The migration copies it
 # from the old ~/.gitconfig when it can. Otherwise it skips (and retries on the
-# next run) until `make git-setup` has created the file.
+# next run) until `make git-setup` has created it.
 
 up() {
-    local stamp dotfiles_git user_file old_gitconfig="" name email
+    local stamp link_target user_file old_gitconfig="" name email
     stamp="$(date +%Y%m%d-%H%M%S)"
-    dotfiles_git="$DOTFILES_DIR/config/git"
+    link_target="../${DOTFILES_DIR#"$HOME"/}/config/git"
     user_file="$HOME/.config/git-private/user"
 
     if [ -e "$HOME/.gitconfig" ] || [ -L "$HOME/.gitconfig" ]; then
@@ -25,18 +26,16 @@ up() {
         info "Moved ~/.gitconfig to $old_gitconfig (it overrode the dotfiles config)."
     fi
 
-    # When ~/.config/git already is a link to the repo, its files are the repo's
-    # own files and must not be touched.
-    if [ "$(cd "$HOME/.config/git" 2>/dev/null && pwd -P)" != "$(cd "$dotfiles_git" && pwd -P)" ]; then
-        mkdir -p "$HOME/.config/git"
-        for f in config ignore; do
-            local target="$HOME/.config/git/$f"
-            if [ -f "$target" ] && [ ! -L "$target" ]; then
-                mv "$target" "$target.bak-$stamp"
-                info "Moved the copied ~/.config/git/$f to $target.bak-$stamp."
-            fi
-            [ -e "$target" ] || ln -s "$dotfiles_git/$f" "$target"
-        done
+    if [ "$(readlink "$HOME/.config/git" 2>/dev/null)" != "$link_target" ]; then
+        if [ -L "$HOME/.config/git" ]; then
+            rm "$HOME/.config/git"
+        elif [ -e "$HOME/.config/git" ]; then
+            mv "$HOME/.config/git" "$HOME/.config/git.bak-$stamp"
+            info "Moved the old ~/.config/git folder to ~/.config/git.bak-$stamp."
+        fi
+        mkdir -p "$HOME/.config"
+        ln -s "$link_target" "$HOME/.config/git"
+        info "Linked ~/.config/git -> $link_target"
     fi
 
     if [ -f "$user_file" ]; then
