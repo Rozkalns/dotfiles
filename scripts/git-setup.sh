@@ -32,7 +32,7 @@ fi
 if [ -f "$USER_FILE" ]; then
     warning "$USER_FILE already exists:"
     sed 's/^/    /' "$USER_FILE"
-    read -p "Overwrite? [y/N] " overwrite
+    read -r -p "Overwrite? [y/N] " overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
         echo "Skipping git setup"
         exit 0
@@ -41,12 +41,12 @@ fi
 
 # Prompt for user info. No default email: work and personal machines differ.
 printf "%sEnter your Git user information:%s\n" "$blue" "$default_color"
-read -p "Full name [Roberts Rožkalns]: " git_name
+read -r -p "Full name [Roberts Rožkalns]: " git_name
 git_name=${git_name:-Roberts Rožkalns}
 
 git_email=""
 while [[ "$git_email" != *@* ]]; do
-    read -p "Email (work or personal, for this machine): " git_email
+    read -r -p "Email (work or personal, for this machine): " git_email
 done
 
 echo ""
