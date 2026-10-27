@@ -1,5 +1,4 @@
 - for git commit messages, follow the project's CONTRIBUTING.md if present, otherwise default to Conventional Commits
-- **commit trailers:** keep Claude Code's `Co-Authored-By` trailer on commits. I work solo on these repos, so no corporate-style AI-disclosure labels, footers or MR notes are needed unless a project's CONTRIBUTING.md asks for them.
 - use `jq` for JSON parsing in bash, not `python3 -c "import json..."`
 - **local dev:** use `rg` (ripgrep) instead of grep or find
 - **server (production/staging):** use standard POSIX tools only (`grep`, `find`, `awk`, `sed`) — do not assume `rg` or other non-default tools are installed
