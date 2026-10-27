@@ -124,9 +124,9 @@
 	# Safe force push (checks remote state first)
 	pfl = "!f() { git push --force-with-lease=$(git rev-parse --abbrev-ref HEAD):${1:-@{u}}; }; f"
 
-	# Stay current with the default branch (fetches only that branch)
-	sync = "!b=$(git default-branch) && git fetch origin \"$b\" && git merge \"origin/$b\""
-	sync-rebase = "!b=$(git default-branch) && git fetch origin \"$b\" && git rebase \"origin/$b\""
+	# Rebase the current branch onto the latest default branch (fetches only that branch).
+	# A pushed branch then needs `git pfl`.
+	sync = "!b=$(git default-branch) && git fetch origin \"$b\" && git rebase \"origin/$b\""
 	ril = "!git rebase -i $(git merge-base --fork-point origin/$(git default-branch))"
 
 	# Find who to ask for PR review (shows authors of changed files)
