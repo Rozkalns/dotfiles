@@ -1,7 +1,8 @@
 # Git Configuration
-# Include this in your global git config:
-# git config --global include.path ~/.dotfiles/config/git/config
-# Or symlink to ~/.config/git/config
+# Symlinked to ~/.config/git/config (`make` stows config/ into ~/.config).
+# Keep ~/.gitconfig absent: git reads it last, so it would override this file.
+# Private settings (identity, work aliases) live outside this public repo,
+# see the [include] sections at the end.
 
 [core]
 	excludesfile = ~/.config/git/ignore
@@ -21,6 +22,7 @@
 	default = simple
 	followTags = true
 	autoSetupRemote = true
+	recurseSubmodules = no
 
 [fetch]
 	prune = true
@@ -38,11 +40,10 @@
 [grep]
 	lineNumber = true
 
-[status]
-	submodulesummary = 1
-
 [submodule]
-	recurse = true
+	# true would reset submodules to their pinned commit on every checkout and pull
+	recurse = false
+	fetchJobs = 4
 
 [diff]
 	renames = copies
@@ -61,9 +62,25 @@
 	light = false
 	line-numbers = true
 	side-by-side = true
+	features = decorations
 
 [delta "interactive"]
 	keep-plus-minus-markers = false
+
+[delta "decorations"]
+	commit-decoration-style = blue ol
+	commit-style = raw
+	file-style = omit
+	hunk-header-decoration-style = blue box
+	hunk-header-file-style = red
+	hunk-header-line-number-style = "#067a00"
+	hunk-header-style = file line-number syntax
+
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
 
 [alias]
 	# Shortcuts
@@ -72,37 +89,57 @@
 	br = branch
 	ci = commit
 	amend = commit --amend --reuse-message=HEAD
+	ec = config --global -e
 
 	# Logs
 	l = log --graph --abbrev-commit --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset'
 	ll = log --graph --abbrev-commit --pretty=oneline
+	last = log -1 HEAD
+	contributors = shortlog --summary --numbered
 
 	# Diffs
 	d = diff
 	ds = -c delta.side-by-side=true diff
 
-	# Useful commands
+	# Undo
 	undo = reset --soft HEAD^
 	redo = reset --hard HEAD@{1}
 	unstage = reset HEAD --
-	last = log -1 HEAD
-	contributors = shortlog --summary --numbered
-	publish = push -u origin HEAD
 
-	# Quick workflow
+	# Quick commits
+	cm = "!git add -A && git commit -m"
 	save = "!git add -A && git commit -m 'SAVEPOINT'"
 	wip = commit -am "WIP"
+	wipe = "!git add -A && git commit -qm 'WIPE SAVEPOINT' && git reset HEAD~1 --hard"
 
+	# Branches
+	this-branch = rev-parse --abbrev-ref HEAD
+	default-branch = "!git symbolic-ref --short refs/remotes/origin/HEAD | sed 's|^origin/||'"
+	# Fuzzy branch switching (requires fzf)
+	fsw = "!git branch -a | fzf | xargs git switch"
+	# Clean up merged branches: `git prune-merged` (bin/git-prune-merged, handles squash merges)
+
+	# Push
+	publish = push -u origin HEAD
 	# Safe force push (checks remote state first)
 	pfl = "!f() { git push --force-with-lease=$(git rev-parse --abbrev-ref HEAD):${1:-@{u}}; }; f"
 
+	# Stay current with the default branch (fetches only that branch)
+	sync = "!b=$(git default-branch) && git fetch origin \"$b\" && git merge \"origin/$b\""
+	sync-rebase = "!b=$(git default-branch) && git fetch origin \"$b\" && git rebase \"origin/$b\""
+	ril = "!git rebase -i $(git merge-base --fork-point origin/$(git default-branch))"
+
 	# Find who to ask for PR review (shows authors of changed files)
-	reviewers = "!git diff --name-only $(git merge-base --fork-point ${1:-main}).. | xargs -n 1 git blame -w -M --porcelain | grep '^author ' | sort | uniq -c | sort -nr | head -10"
+	reviewers = "!git diff --name-only $(git merge-base --fork-point ${1:-origin/$(git default-branch)}).. | xargs -n 1 git blame -w -M --porcelain | grep '^author ' | sort | uniq -c | sort -nr | head -10"
 
-	# Fuzzy branch switching (requires fzf)
-	fsw = "!git branch -a | fzf | xargs git switch"
-
-	# Clean up merged branches: `git prune-merged` (bin/git-prune-merged, handles squash merges)
+	# Links (GitHub and GitLab)
+	web-url = "!git remote get-url origin | sed -E -e 's|^git@([^:]+):|https://\\1/|' -e 's|\\.git$||'"
+	compare-url = "!echo \"$(git web-url)/compare/$(git default-branch)...$(git this-branch)\""
 
 [color]
 	ui = auto
+
+# Private, not in this repo. A missing file is skipped. It can include more
+# private files itself, for example work aliases with [includeIf "gitdir:..."].
+[include]
+	path = ~/.config/git-private/user
