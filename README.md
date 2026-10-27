@@ -27,6 +27,7 @@ Personal development environment configuration for **macOS and Linux**.
 - [Features](#features)
 - [Customization](#customization)
 - [Maintenance](#maintenance)
+- [Git](#git)
 - [Work Computer Setup](#work-computer-setup)
 - [Troubleshooting](#troubleshooting)
 - [Credits](#credits)
@@ -128,9 +129,39 @@ make update                                        # Update everything via topgr
 brew bundle dump --file=homebrew/Brewfile --force  # Sync Brewfile with installed packages
 ```
 
+## Git
+
+All git settings and aliases are in one file, `config/git/config`, linked to `~/.config/git/config`. Do not create `~/.gitconfig`: git reads it last, so it overrides this file.
+
+Private settings are not in this repo. The config includes `~/.config/git-private/user`, and skips it if it does not exist:
+
+| File | Contents | How to get it |
+|------|----------|---------------|
+| `user` | name and email for this machine (work or personal) | `make git-setup` |
+| other files | work aliases, included from `user` with `[includeIf "gitdir:<work folder>/"]` | copy them by hand from the old work computer |
+
+**New machine:**
+```bash
+make link && make git-setup
+```
+
+**Existing machine** (set up before the single-file change):
+```bash
+make sync && make migrate    # run `make git-setup` too if the migration asks for it
+```
+
+The migration moves an old `~/.gitconfig` to `~/.gitconfig.bak-<timestamp>` and copies its name and email to `~/.config/git-private/user`. It also replaces copied files in `~/.config/git/` with links.
+
+Check which file a setting comes from:
+```bash
+git config --show-origin --get user.email
+```
+
 ## Work Computer Setup
 
 **Safe to use:** editor configs, shell config, aliases, WezTerm
+
+**Git:** run `make git-setup` with the work email, then copy the work alias files in `~/.config/git-private/` from the old work computer and add their `includeIf` lines to `user`.
 
 **Review first:**
 - `homebrew/Brewfile` — contains personal apps (Spotify, etc.)
