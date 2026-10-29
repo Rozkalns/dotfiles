@@ -65,7 +65,10 @@ guard between a session and production, so a workaround removes the protection, 
 
 What the lines mean:
 - `production.ERROR` with an exception: the 500. The first line gives class, message, file:line.
-- `Access denied` (notice): a 403, with `ability`, `model`, `model_key` when a policy refused.
+- `Access denied` (notice): a 403, with `ability`, `model`, `model_key` when a policy refused, and
+  `referrer_route`: the page the user came from (`external` = another site), so "how did they get
+  here" is usually answered without the audit log. `impersonated_by` means an admin was acting as
+  that user; a 403 then is often expected.
 - `Validation failed` (info): rule names per field, never values.
 
 ## 3. Audit log
