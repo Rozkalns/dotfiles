@@ -70,10 +70,17 @@ What the lines mean:
 
 ## 3. Audit log
 
-What the request changed, by the indexed `activity_log.request_id` column (read-only):
+What happened around the request: the audit entries a few minutes before and after `Laiks`, with
+`request_id` as a column so the request's own entries stand out. Only a request that changed
+something writes audit entries. A 403 or a failed form writes none; then the entries just before
+it show how the user got there.
+
+The guard hook rejects quotes inside the SQL, so the query has no string literals: the window is in
+Unix seconds (`created_at` is UTC). Get each bound from the UTC time with
+`date -u -j -f '%Y-%m-%d %H:%M:%S' '2026-10-29 09:20:00' +%s`.
 
 ```bash
-ssh <ssh> 'sqlite3 -readonly <database> "SELECT id, created_at, description, causer_id, subject_type, subject_id, school_id FROM activity_log WHERE request_id = '\''<ID>'\''"'
+ssh <ssh> 'sqlite3 -readonly <database> "SELECT id, created_at, request_id, description, causer_id, subject_type, subject_id, school_id FROM activity_log WHERE (julianday(created_at) - 2440587.5) * 86400 BETWEEN <from> AND <to> ORDER BY id"'
 ```
 
 Select IDs and metadata only. The database holds sensitive personal data, and anything printed
