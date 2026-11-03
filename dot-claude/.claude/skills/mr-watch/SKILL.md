@@ -10,7 +10,9 @@ All work goes through one CLI. Run it and show its output. Don't edit the config
 ```
 mr-watch on | off            # start / stop the LaunchAgent (off survives reboot)
 mr-watch quiet [60m|2h|off]  # mute on top of the speaking hours
-mr-watch status              # poll now, print and speak what's up
+mr-watch status              # poll now (~10 s), print and speak what's up
+mr-watch list                # what is watched, from the last poll; instant, no speech
+mr-watch again               # say the last message again, with its time
 mr-watch add <ref>…          # watch an MR
 mr-watch remove <ref>…       # stop watching; also hides it from the API search
 mr-watch chain <ref> <ref>…  # set a merge order; `chain clear [<ref>]` removes it
@@ -43,6 +45,10 @@ Settings the CLI doesn't change (`speak_hours`, `interval_minutes`, `forges`, `o
 ## Voice
 
 `say` uses the macOS System voice, so there is no voice setting in mr-watch. When the user wants another voice, run `mr-watch voice` and show the steps: System Settings → Accessibility → Spoken Content → System voice.
+
+## Hotkey for "again"
+
+`raycast/mr-watch-again.sh` is a Raycast script command. To set it up once: Raycast Settings → Extensions → + → Add Script Directory → pick `~/.dotfiles/dot-claude/.claude/skills/mr-watch/raycast`. Then give "Repeat Last MR Update" a hotkey.
 
 ## When something looks wrong
 

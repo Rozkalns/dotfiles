@@ -59,7 +59,9 @@ One CLI; the Claude skill and the terminal call the same commands:
 ```
 mr-watch on | off            # launchctl enable+bootstrap / bootout+disable (off survives reboot)
 mr-watch quiet [60m|2h|off]  # mute on top of the speaking hours
-mr-watch status              # speak + print what's up now
+mr-watch status              # poll now, print and speak what's up
+mr-watch list                # what is watched, from the last poll (no network, no speech)
+mr-watch again               # say the last message again, with its time (Raycast script command for a hotkey)
 mr-watch add <ref>…
 mr-watch remove <ref>…
 mr-watch chain <ref> <ref> … # set a merge order
