@@ -27,6 +27,8 @@ A standalone watcher that polls GitLab with `glab` and GitHub with `gh`, and spe
 
 On GitHub there is no "N of M approved" count, so it says "2 approvals" instead.
 
+MR numbers and keys are spelled out: digits one by one and letters in the NATO alphabet ("7406" → "seven four zero six", "AB-1234" → "Alfa Bravo one two three four"). Counts and times are read as normal numbers. An MR from a repo other than the main one gets the repo name first ("kartites seven nine eight").
+
 ### What it watches
 
 - My own open, non-draft MRs, found through the API (`author = me`), across all repos, on each forge where the CLI is logged in.

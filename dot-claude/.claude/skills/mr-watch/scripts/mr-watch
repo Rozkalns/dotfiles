@@ -211,11 +211,25 @@ may_speak() {
   [[ ! $t < $from && $t < $to ]]
 }
 
+# MR numbers and keys are marked ‹7406› in messages
+plain() { local s=${1//‹/}; printf '%s\n' "${s//›/}"; }
+
+# ‹AB-1234› → "Alfa Bravo one two three four"
+spoken() {
+  perl -CS -Mutf8 -pe '
+    BEGIN {
+      @d = qw(zero one two three four five six seven eight nine);
+      @n{"A".."Z"} = qw(Alfa Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kilo Lima Mike
+                         November Oscar Papa Quebec Romeo Sierra Tango Uniform Victor Whiskey X-ray Yankee Zulu);
+    }
+    s{‹([^›]*)›}{join " ", map { /\d/ ? $d[$_] : ($n{uc $_} // ()) } split //, $1}ge' <<<"$1"
+}
+
 speak() {
   [[ -z $1 ]] && return
-  echo "$(date '+%F %T') $1"
+  echo "$(date '+%F %T') $(plain "$1")"
   mkdir -p "$STATE_DIR" && printf '%s\t%s\n' "$(now)" "$1" >"$STATE_DIR/last"
-  [[ -n ${MR_WATCH_NO_SAY:-} ]] || say "$1"
+  [[ -n ${MR_WATCH_NO_SAY:-} ]] || say "$(spoken "$1")"
 }
 
 cmd_again() {
@@ -228,10 +242,10 @@ cmd_again() {
     local line
     line=$(grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:]{8} ' "$LOG" 2>/dev/null | grep -v ' (silent) ' | tail -1)
     [[ -n $line ]] || { echo "Nothing said yet."; return; }
-    text="At ${line:11:5}. ${line:20}"
+    text="At ${line:11:5}. $(perl -CS -Mutf8 -pe 's/\b(\d{3,})\b/‹$1›/g' <<<"${line:20}")"
   fi
-  echo "$text"
-  [[ -n ${MR_WATCH_NO_SAY:-} ]] || say "$text"
+  plain "$text"
+  [[ -n ${MR_WATCH_NO_SAY:-} ]] || say "$(spoken "$text")"
 }
 
 # ---------- tick ----------
@@ -310,8 +324,8 @@ poll() {
   snaps=$(jq '
     def repo: split("[!#]"; null)[0];
     ([keys[] | repo] | group_by(.) | max_by(length) | .[0] // "") as $main
-    | with_entries(.value.label = (if (.key | repo) == $main then .value.num
-                                   else "\(.key | repo | split("/") | last) \(.value.num)" end))' <<<"$snaps")
+    | with_entries(.value.label = (if (.key | repo) == $main then "‹\(.value.num)›"
+                                   else "\(.key | repo | split("/") | last) ‹\(.value.num)›" end))' <<<"$snaps")
 
   EVENTS=$(jq -n --argjson prev "$(jq '.mrs // {}' <<<"$STATE_JSON")" --argjson cur "$snaps" \
     --argjson first "$first_run" --slurpfile c "$CONF" '
@@ -331,8 +345,8 @@ poll() {
                else ($ch | index([$ref])) as $i
                  | ($ch[$i + 1:] | map(select(($cur[.].state // "open") == "open"))) as $rest
                  | if ($rest | length) == 0 then " The chain is done."
-                   elif $cur[$rest[0]].ready then " \($cur[$rest[0]].label // ($rest[0] | split("[!#]"; null) | last)) is next and ready to merge."
-                   else " Next in the chain is \($cur[$rest[0]].label // ($rest[0] | split("[!#]"; null) | last))." end
+                   elif $cur[$rest[0]].ready then " \($cur[$rest[0]].label // ("‹" + ($rest[0] | split("[!#]"; null) | last) + "›")) is next and ready to merge."
+                   else " Next in the chain is \($cur[$rest[0]].label // ("‹" + ($rest[0] | split("[!#]"; null) | last) + "›"))." end
                end) as $tail
             | {type: "merged", text: "\($n.label) is merged.\($tail)"}
           elif $n.state != "open" then empty
@@ -430,7 +444,7 @@ cmd_tick() {
     STATE_JSON=$(jq '.queue = []' <<<"$STATE_JSON")
   else
     STATE_JSON=$(jq --argjson q "$queued" '.queue = ((.queue // []) + $q)' <<<"$STATE_JSON")
-    jq -r --arg d "$(date '+%F %T')" '.[] | "\($d) (silent) \(.text)"' <<<"$EVENTS"
+    jq -r --arg d "$(date '+%F %T')" '.[] | "\($d) (silent) \(.text | gsub("[‹›]"; ""))"' <<<"$EVENTS"
   fi
   save_state "$STATE_JSON"
   speak "$text"
@@ -601,7 +615,7 @@ cmd_chain() {
 
 cmd_voice() {
   if [[ ${1:-} == test ]]; then
-    say "New approval on 101 from Anna. 4 of 5 approved."
+    say "$(spoken "New approval on ‹7406› from Anna. 4 of 5 approved.")"
   else
     voice_help
   fi
