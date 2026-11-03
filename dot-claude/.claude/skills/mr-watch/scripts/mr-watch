@@ -1,0 +1,584 @@
+#!/usr/bin/env bash
+# mr-watch – speak GitLab MR and GitHub PR updates. See SKILL.md.
+set -uo pipefail
+
+CONF_DIR="${MR_WATCH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mr-watch}"
+STATE_DIR="${MR_WATCH_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mr-watch}"
+CONF="$CONF_DIR/config.json"
+STATE="$STATE_DIR/state.json"
+LOCK="$STATE_DIR/lock"
+LOG="$STATE_DIR/tick.log"
+LABEL="com.user.mr-watch"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+SELF="$(readlink -f "$0")"
+
+die() { echo "mr-watch: $*" >&2; exit 1; }
+now() { date +%s; }
+
+# ---------- config and state ----------
+
+forge_ok() {
+  case "$1" in
+    gitlab) command -v glab >/dev/null && glab auth status >/dev/null 2>&1 ;;
+    github) command -v gh >/dev/null && gh auth status >/dev/null 2>&1 ;;
+  esac
+}
+
+init_config() {
+  [[ -f "$CONF" ]] && return
+  mkdir -p "$CONF_DIR"
+  local forges=()
+  forge_ok gitlab && forges+=(gitlab)
+  forge_ok github && forges+=(github)
+  jq -n --arg gh "${GITLAB_HOST:-}" --args '{
+    enabled: false, muted_until: null,
+    gitlab_host: (if $gh == "" then null else $gh end),
+    speak_hours: {days: "1-5", from: "08:00", to: "19:00"},
+    interval_minutes: 3,
+    forges: $ARGS.positional,
+    watch: {own_open_mrs: true, review_requests: true, mrs: [], chains: [], sources: [], ignore: []}
+  }' "${forges[@]}" >"$CONF"
+}
+
+conf() { jq -r "$1" "$CONF"; }
+
+# launchd doesn't pass on the shell's GITLAB_HOST
+use_gitlab_host() {
+  [[ -n ${GITLAB_HOST:-} ]] && return
+  local h; h=$(conf '.gitlab_host // empty')
+  [[ -n $h ]] && export GITLAB_HOST="$h"
+}
+
+conf_set() {
+  local tmp="$CONF.tmp"
+  jq "$@" <"$CONF" >"$tmp" && [[ -s $tmp ]] && mv "$tmp" "$CONF" || die "config update failed, $CONF left as it was"
+}
+
+load_state() {
+  mkdir -p "$STATE_DIR"
+  [[ -f "$STATE" ]] && cat "$STATE" || echo '{}'
+}
+
+save_state() {
+  printf '%s\n' "$1" >"$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+}
+
+# ---------- refs ----------
+
+origin_repo() {
+  local url
+  url=$(git remote get-url origin 2>/dev/null) || die "not in a git repo with an origin remote"
+  url=${url%.git}
+  url=${url#*://}
+  url=${url#*@}
+  url=${url/://}
+  echo "${url#*/}"
+}
+
+norm_ref() {
+  local r="$1"
+  if [[ $r =~ ^https?://[^/]+/(.+)/-/merge_requests/([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}!${BASH_REMATCH[2]}"
+  elif [[ $r =~ ^https?://github\.com/([^/]+/[^/]+)/pull/([0-9]+) ]]; then
+    echo "${BASH_REMATCH[1]}#${BASH_REMATCH[2]}"
+  elif [[ $r =~ ^[^!#]+[!#][0-9]+$ ]]; then
+    echo "$r"
+  elif [[ $r =~ ^([!#])([0-9]+)$ ]]; then
+    echo "$(origin_repo)${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
+  else
+    die "not an MR reference: $r (use group/project!123, owner/repo#123, !123, #123 or a URL)"
+  fi
+}
+
+forge_of() { [[ $1 == *'!'* ]] && echo gitlab || echo github; }
+
+# ---------- forge adapters ----------
+
+me_of() {
+  local forge="$1" cached
+  cached=$(jq -r --arg f "$forge" '.me[$f] // empty' <<<"$STATE_JSON")
+  if [[ -n $cached ]]; then echo "$cached"; return; fi
+  case "$forge" in
+    gitlab) glab api user | jq -r .username ;;
+    github) gh api user --jq .login ;;
+  esac
+}
+
+# prints "ref<TAB>role" lines; fails when the forge can't be reached
+discover() {
+  local forge="$1" me="$2" out
+  case "$forge" in
+    gitlab)
+      if [[ $(conf .watch.own_open_mrs) == true ]]; then
+        out=$(glab api "merge_requests?author_username=$me&state=opened&scope=all&per_page=100") || return 1
+        jq -r '.[] | select(.draft|not) | "\(.references.full)\town"' <<<"$out"
+      fi
+      if [[ $(conf .watch.review_requests) == true ]]; then
+        out=$(glab api "merge_requests?reviewer_username=$me&state=opened&scope=all&per_page=100") || return 1
+        jq -r '.[] | select(.draft|not) | "\(.references.full)\treview"' <<<"$out"
+      fi ;;
+    github)
+      if [[ $(conf .watch.own_open_mrs) == true ]]; then
+        out=$(gh search prs --author=@me --state=open --limit 100 --json repository,number,isDraft) || return 1
+        jq -r '.[] | select(.isDraft|not) | "\(.repository.nameWithOwner)#\(.number)\town"' <<<"$out"
+      fi
+      if [[ $(conf .watch.review_requests) == true ]]; then
+        out=$(gh search prs --review-requested=@me --state=open --limit 100 --json repository,number,isDraft) || return 1
+        jq -r '.[] | select(.isDraft|not) | "\(.repository.nameWithOwner)#\(.number)\treview"' <<<"$out"
+      fi ;;
+  esac
+}
+
+# prints one normalized snapshot as JSON
+fetch_gitlab() {
+  local ref="$1" me="$2" proj iid enc mr ap notes
+  proj=${ref%!*}; iid=${ref##*!}
+  enc=$(jq -rn --arg s "$proj" '$s|@uri')
+  mr=$(glab api "projects/$enc/merge_requests/$iid") || return 1
+  ap=$(glab api "projects/$enc/merge_requests/$iid/approvals") || return 1
+  notes=$(glab api "projects/$enc/merge_requests/$iid/notes?per_page=100&sort=desc&order_by=created_at") || return 1
+  jq -n --arg ref "$ref" --arg me "$me" --argjson mr "$mr" --argjson ap "$ap" --argjson notes "$notes" '
+    def first: split(" ")[0];
+    def is_bot: (.bot // false) or (.username | test("bot"; "i"));
+    ($mr.state | if . == "opened" then "open" else . end) as $st
+    | ($mr.head_pipeline.status // null) as $p
+    | ($mr.detailed_merge_status) as $d
+    | {
+        ref: $ref, num: ($mr.iid | tostring), state: $st, title: $mr.title,
+        author: $mr.author.username, author_name: ($mr.author.name | first),
+        approvers: ([$ap.approved_by[].user | select(.username != $me) | .name | first] | sort),
+        i_approved: any($ap.approved_by[]; .user.username == $me),
+        approved_count: ($ap.approved_by | length),
+        approvals_left: $ap.approvals_left,
+        pipeline: (if $p == null then null elif $p == "success" then "success"
+                   elif ($p == "failed" or $p == "canceled") then "failed" else "running" end),
+        ready: ($st == "open" and ($mr.draft | not) and (
+          $d == "mergeable" or
+          (($d == "unchecked" or $d == "checking") and $ap.approvals_left == 0
+            and $mr.blocking_discussions_resolved and ($mr.has_conflicts | not) and $p == "success"))),
+        notes: [$notes[] | select(.system | not) | select(.author.username != $me)
+                | select(.author | is_bot | not) | {id: (.id | tostring), who: (.author.name | first)}],
+        me_reviewer: any($mr.reviewers[]; .username == $me)
+      }'
+}
+
+fetch_github() {
+  local ref="$1" me="$2" repo num pr
+  repo=${ref%#*}; num=${ref##*#}
+  pr=$(gh pr view "$num" -R "$repo" --json number,state,isDraft,title,author,latestReviews,reviews,mergeStateStatus,statusCheckRollup,comments,reviewRequests) || return 1
+  jq -n --arg ref "$ref" --arg me "$me" --argjson pr "$pr" '
+    def who: (.name // "" | if . == "" then null else split(" ")[0] end) // .login;
+    def is_bot: .login | test("\\[bot\\]$|bot$"; "i");
+    ($pr.state | ascii_downcase) as $st
+    | [$pr.statusCheckRollup[]? | (.conclusion // .state // "") | ascii_upcase] as $c
+    | [$pr.statusCheckRollup[]? | select((.status // "COMPLETED") != "COMPLETED" or .state == "PENDING")] as $pending
+    | {
+        ref: $ref, num: ($pr.number | tostring), state: $st, title: $pr.title,
+        author: $pr.author.login, author_name: ($pr.author | who),
+        approvers: ([$pr.latestReviews[] | select(.state == "APPROVED") | .author
+                     | select(.login != $me) | who] | sort),
+        i_approved: any($pr.latestReviews[]; .state == "APPROVED" and .author.login == $me),
+        approved_count: ([$pr.latestReviews[] | select(.state == "APPROVED")] | length),
+        approvals_left: null,
+        pipeline: (if ($c | length) == 0 then null
+                   elif any($c[]; . == "FAILURE" or . == "TIMED_OUT" or . == "ERROR" or . == "CANCELLED") then "failed"
+                   elif ($pending | length) > 0 then "running" else "success" end),
+        ready: ($st == "open" and ($pr.isDraft | not) and $pr.mergeStateStatus == "CLEAN"),
+        notes: ([$pr.comments[] | {id, author}]
+                + [$pr.reviews[] | select(.state == "COMMENTED" or .state == "CHANGES_REQUESTED") | {id, author}]
+                | map(select(.author.login != $me) | select(.author | is_bot | not)
+                      | {id: (.id | tostring), who: (.author | who)})),
+        me_reviewer: any($pr.reviewRequests[]?; .login == $me)
+      }'
+}
+
+# ---------- speaking ----------
+
+may_speak() {
+  local muted days from to d t lo hi
+  [[ $(conf .enabled) == true ]] || return 1
+  muted=$(conf '.muted_until // 0')
+  (( muted > $(now) )) && return 1
+  days=$(conf .speak_hours.days); from=$(conf .speak_hours.from); to=$(conf .speak_hours.to)
+  d=$(date +%u); t=$(date +%H:%M)
+  local ok=1 part
+  IFS=, read -ra parts <<<"$days"
+  for part in "${parts[@]}"; do
+    if [[ $part == *-* ]]; then lo=${part%-*}; hi=${part#*-}; (( d >= lo && d <= hi )) && ok=0
+    else (( d == part )) && ok=0; fi
+  done
+  (( ok == 0 )) || return 1
+  [[ ! $t < $from && $t < $to ]]
+}
+
+speak() {
+  [[ -z $1 ]] && return
+  echo "$(date '+%F %T') $1"
+  [[ -n ${MR_WATCH_NO_SAY:-} ]] || say "$1"
+}
+
+# ---------- tick ----------
+
+with_lock() {
+  mkdir -p "$STATE_DIR"
+  if ! mkdir "$LOCK" 2>/dev/null; then
+    # a lock older than 10 minutes is left over from a crash
+    if [[ -n $(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null) ]]; then rmdir "$LOCK"; mkdir "$LOCK" || exit 0
+    else exit 0; fi
+  fi
+  trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+}
+
+# poll everything; sets STATE_JSON and EVENTS (JSON array of {type,text})
+poll() {
+  local first_run=false forge me roles='{}' snaps='{}' down='{}' line ref role snap
+  [[ -f "$STATE" ]] || first_run=true
+  STATE_JSON=$(load_state)
+
+  local forges
+  forges=$(conf '.forges[]')
+  for forge in $forges; do
+    if ! me=$(me_of "$forge") || [[ -z $me ]]; then
+      down=$(jq --arg f "$forge" '.[$f] = true' <<<"$down"); continue
+    fi
+    STATE_JSON=$(jq --arg f "$forge" --arg m "$me" '.me[$f] = $m' <<<"$STATE_JSON")
+    local found
+    if ! found=$(discover "$forge" "$me"); then
+      down=$(jq --arg f "$forge" '.[$f] = true' <<<"$down"); continue
+    fi
+    while IFS=$'\t' read -r ref role; do
+      [[ -z $ref ]] && continue
+      roles=$(jq --arg r "$ref" --arg role "$role" '.[$r] = (if .[$r] == "own" then "own" else $role end)' <<<"$roles")
+    done <<<"$found"
+  done
+
+  # extra MRs, chains, and open MRs from the last tick (to catch the merge)
+  roles=$(jq --slurpfile c "$CONF" --argjson s "$STATE_JSON" '
+    . as $r
+    | ($c[0].watch.mrs + ($c[0].watch.chains | add // [])) as $extra
+    | reduce $extra[] as $x ($r; .[$x] //= "extra")
+    | reduce (($s.mrs // {}) | to_entries[] | select(.value.state == "open")) as $e (.; .[$e.key] //= ($e.value.role // "extra"))
+    | reduce $c[0].watch.ignore[] as $i (.; del(.[$i]))' <<<"$roles")
+
+  while IFS=$'\t' read -r ref role; do
+    [[ -z $ref ]] && continue
+    forge=$(forge_of "$ref")
+    me=""
+    [[ $(jq -r --arg f "$forge" '.[$f] // false' <<<"$down") == true ]] \
+      || me=$(jq -r --arg f "$forge" '.me[$f] // empty' <<<"$STATE_JSON")
+    if [[ -z $me ]] || ! snap=$("fetch_$forge" "$ref" "$me" 2>/dev/null); then
+      [[ -n $me ]] && echo "mr-watch: could not fetch $ref" >&2
+      snap=$(jq --arg r "$ref" '.mrs[$r] // empty' <<<"$STATE_JSON")
+      [[ -z $snap ]] && continue
+    fi
+    snaps=$(jq --arg r "$ref" --arg role "$role" --argjson s "$snap" '.[$r] = ($s + {role: $role})' <<<"$snaps")
+  done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' <<<"$roles")
+
+  EVENTS=$(jq -n --argjson prev "$(jq '.mrs // {}' <<<"$STATE_JSON")" --argjson cur "$snaps" \
+    --argjson first "$first_run" --slurpfile c "$CONF" '
+    def names: if length == 1 then .[0] elif length == 2 then "\(.[0]) and \(.[1])"
+               else (.[:-1] | join(", ")) + " and " + .[-1] end;
+    $c[0].watch.chains as $chains
+    | if $first then [] else
+      [ $cur | to_entries[] | .key as $ref | .value as $n | $prev[$ref] as $p
+        | if $n.role == "review" then
+            select($n.state == "open" and ($n.i_approved | not) and $n.me_reviewer != false
+                   and ($p == null or ($p.me_reviewer | not)))
+            | {type: "review", text: "\($n.author_name) asked you to review \($n.num). Worth a look."}
+          elif $p == null then empty
+          elif $p.state == "open" and $n.state == "merged" then
+            ([$chains[] | select(index([$ref]) != null)] | first // null) as $ch
+            | (if $ch == null then ""
+               else ($ch | index([$ref])) as $i
+                 | ($ch[$i + 1:] | map(select(($cur[.].state // "open") == "open"))) as $rest
+                 | if ($rest | length) == 0 then " The chain is done."
+                   elif $cur[$rest[0]].ready then " \($cur[$rest[0]].num // ($rest[0] | split("[!#]"; null) | last)) is next and ready to merge."
+                   else " Next in the chain is \($cur[$rest[0]].num // ($rest[0] | split("[!#]"; null) | last))." end
+               end) as $tail
+            | {type: "merged", text: "\($n.num) is merged.\($tail)"}
+          elif $n.state != "open" then empty
+          else
+            (($n.approvers - $p.approvers) as $new
+             | select(($new | length) > 0)
+             | (if $n.approvals_left == null then ""
+                elif $n.approvals_left > 0 then " \($n.approved_count) of \($n.approved_count + $n.approvals_left) approved."
+                elif ($n.ready and ($p.ready | not)) then ""
+                else " Fully approved." end) as $count
+             | if ($new | length) == 1 then {type: "approval", n: 1, text: "New approval on \($n.num) from \($new[0]).\($count)"}
+               else {type: "approval", n: ($new | length), text: "\($new | names) approved \($n.num).\($count)"} end),
+            (select($n.ready and ($p.ready | not)) | {type: "ready", text: "\($n.num) is ready to merge."}),
+            (select($n.pipeline == "failed" and $p.pipeline != "failed") | {type: "failed", text: "Pipeline failed on \($n.num)."}),
+            (($p.notes | map(.id)) as $old
+             | [$n.notes[] | select(.id as $i | $old | index([$i]) | not)] as $fresh
+             | select(($fresh | length) > 0)
+             | ($fresh | map(.who) | unique) as $who
+             | {type: "comment", n: ($fresh | length),
+                text: (if ($who | length) > 2 then "\($who | length) people commented on \($n.num)."
+                       else "\($who | names) commented on \($n.num)." end)})
+          end
+      ] end')
+
+  # a forge that goes down or comes back is said once
+  local f
+  for f in $forges; do
+    local was is
+    was=$(jq -r --arg f "$f" '.down[$f] // false' <<<"$STATE_JSON")
+    is=$(jq -r --arg f "$f" '.[$f] // false' <<<"$down")
+    local name; [[ $f == gitlab ]] && name=GitLab || name=GitHub
+    if [[ $is == true && $was != true ]]; then
+      EVENTS=$(jq --arg t "mr-watch can't reach $name." '[{type: "system", text: $t}] + .' <<<"$EVENTS")
+    elif [[ $is != true && $was == true ]]; then
+      EVENTS=$(jq --arg t "$name is back." '[{type: "system", text: $t}] + .' <<<"$EVENTS")
+    fi
+  done
+
+  STATE_JSON=$(jq --argjson s "$snaps" --argjson d "$down" --argjson t "$(now)" \
+    '.mrs = $s | .down = $d | .last_poll = $t' <<<"$STATE_JSON")
+
+  # merged extra MRs leave the list; a chain leaves when all of it is merged
+  local merged
+  merged=$(jq -c '[to_entries[] | select(.value.state != "open") | .key]' <<<"$snaps")
+  conf_set --argjson m "$merged" '
+    .watch.mrs -= $m
+    | .watch.chains |= map(select(all(.[]; . as $r | $m | index([$r]) != null) | not))'
+
+  if $first_run; then
+    local count
+    count=$(jq '[.[] | select(.state == "open")] | length' <<<"$snaps")
+    EVENTS=$(jq -n --arg t "mr-watch is watching $count merge requests." '[{type: "system", text: $t}]')
+  fi
+}
+
+catch_up_text() {
+  jq -r '
+    def plural($n; $one; $many): "\($n) \(if $n == 1 then $one else $many end)";
+    group_by(.type) | map({type: .[0].type, n: (map(.n // 1) | add)})
+    | map(if .type == "approval" then plural(.n; "approval"; "approvals")
+          elif .type == "comment" then plural(.n; "comment"; "comments")
+          elif .type == "merged" then plural(.n; "merge"; "merges")
+          elif .type == "failed" then plural(.n; "failed pipeline"; "failed pipelines")
+          elif .type == "review" then plural(.n; "review request"; "review requests")
+          elif .type == "ready" then "\(.n) ready to merge"
+          else empty end)
+    | if length == 0 then "" else "While you were away: " + join(", ") + "." end' <<<"$1"
+}
+
+cmd_tick() {
+  local force="${1:-}"
+  init_config
+  use_gitlab_host
+  [[ -n $force || $(conf .enabled) == true ]] || exit 0
+  with_lock
+  STATE_JSON=$(load_state)
+  if [[ -z $force ]]; then
+    local last interval
+    last=$(jq -r '.last_poll // 0' <<<"$STATE_JSON")
+    interval=$(conf .interval_minutes)
+    (( $(now) - last < interval * 60 - 5 )) && exit 0
+  fi
+  [[ -f $LOG ]] && (( $(stat -f %z "$LOG") > 1000000 )) && : >"$LOG"
+
+  poll
+
+  local spoken queued text=""
+  queued=$(jq -c '[.[] | select(.type != "system")]' <<<"$EVENTS")
+  if may_speak; then
+    local backlog
+    backlog=$(jq -c '.queue // []' <<<"$STATE_JSON")
+    text=$(catch_up_text "$backlog")
+    spoken=$(jq -r 'map(.text) | join(" ")' <<<"$EVENTS")
+    text="${text:+$text }$spoken"
+    STATE_JSON=$(jq '.queue = []' <<<"$STATE_JSON")
+  else
+    STATE_JSON=$(jq --argjson q "$queued" '.queue = ((.queue // []) + $q)' <<<"$STATE_JSON")
+    jq -r --arg d "$(date '+%F %T')" '.[] | "\($d) (silent) \(.text)"' <<<"$EVENTS"
+  fi
+  save_state "$STATE_JSON"
+  speak "$text"
+}
+
+# ---------- commands ----------
+
+cmd_status() {
+  cmd_tick force
+  STATE_JSON=$(load_state)
+  echo
+  jq -r '
+    .mrs | to_entries | map(.value) | map(select(.state == "open"))
+    | sort_by(.role, .ref)[]
+    | "\(.role)\t\(.ref)\t\(if .ready then "ready" else "-" end)\t\(.approved_count) approved\tpipeline \(.pipeline // "none")\t\(.title[0:60])"' \
+    <<<"$STATE_JSON" | column -t -s $'\t'
+  echo
+  local hours muted
+  hours=$(conf '"\(.speak_hours.days) \(.speak_hours.from)–\(.speak_hours.to)"')
+  muted=$(conf '.muted_until // 0')
+  echo "enabled: $(conf .enabled)   speak hours: $hours   every $(conf .interval_minutes) min"
+  (( muted > $(now) )) && echo "muted until $(date -r "$muted" '+%H:%M')"
+  if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then echo "launchd: loaded"; else echo "launchd: not loaded"; fi
+  jq -r '.watch.chains[] | "chain: " + join(" → ")' "$CONF"
+
+  local summary
+  summary=$(jq -r '
+    .mrs | map(select(.state == "open")) as $o
+    | ($o | map(select(.role != "review"))) as $mine
+    | ($mine | map(select(.ready)) | map(.num)) as $ready
+    | ($o | map(select(.role == "review" and (.i_approved | not))) | length) as $rev
+    | "\($mine | length) open merge requests."
+      + (if ($ready | length) > 0 then " Ready to merge: \($ready | join(", "))." else "" end)
+      + (if $rev > 0 then " \($rev) review request\(if $rev == 1 then "" else "s" end) for you." else "" end)' \
+    <<<"$STATE_JSON")
+  speak "$summary"
+}
+
+write_plist() {
+  mkdir -p "$(dirname "$PLIST")" "$STATE_DIR"
+  cat >"$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key><string>$LABEL</string>
+    <key>ProgramArguments</key>
+    <array><string>$SELF</string><string>tick</string></array>
+    <key>EnvironmentVariables</key>
+    <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+    <key>StartInterval</key><integer>60</integer>
+    <key>RunAtLoad</key><true/>
+    <key>ProcessType</key><string>Background</string>
+    <key>StandardOutPath</key><string>$LOG</string>
+    <key>StandardErrorPath</key><string>$LOG</string>
+  </dict>
+</plist>
+EOF
+}
+
+voice_help() {
+  cat <<'EOF'
+mr-watch speaks with the macOS System voice. To change it:
+
+  1. Open System Settings → Accessibility → Spoken Content.
+  2. Pick a "System voice". A Siri voice sounds the most natural.
+     More voices: "Manage Voices…" in the same menu (downloads them).
+  3. Set "Speaking rate" on the same screen.
+  4. Test it: mr-watch voice test
+
+`say -v` can't pick Siri voices, so mr-watch has no voice setting of its own.
+EOF
+}
+
+cmd_on() {
+  init_config
+  local first=false
+  [[ -f $PLIST ]] || { write_plist; first=true; }
+  conf_set '.enabled = true'
+  local domain="gui/$(id -u)"
+  launchctl enable "$domain/$LABEL"
+  launchctl print "$domain/$LABEL" >/dev/null 2>&1 || launchctl bootstrap "$domain" "$PLIST"
+  echo "mr-watch is on. It polls every $(conf .interval_minutes) min. Log: $LOG"
+  if $first; then echo; voice_help; fi
+}
+
+cmd_off() {
+  init_config
+  conf_set '.enabled = false'
+  local domain="gui/$(id -u)"
+  launchctl bootout "$domain/$LABEL" 2>/dev/null
+  launchctl disable "$domain/$LABEL"
+  echo "mr-watch is off (stays off after a reboot)."
+}
+
+cmd_quiet() {
+  init_config
+  local arg="${1:-60m}" until
+  case "$arg" in
+    off) conf_set '.muted_until = null'; echo "Mute is off."; return ;;
+    *m) until=$(( $(now) + ${arg%m} * 60 )) ;;
+    *h) until=$(( $(now) + ${arg%h} * 3600 )) ;;
+    *) die "use: mr-watch quiet [60m|2h|off]" ;;
+  esac
+  conf_set --argjson u "$until" '.muted_until = $u'
+  echo "Muted until $(date -r "$until" '+%H:%M'). Missed events are summed up after that."
+}
+
+cmd_add() {
+  init_config
+  [[ $# -gt 0 ]] || die "use: mr-watch add <ref>…"
+  local r
+  for r in "$@"; do
+    [[ $r =~ ^[A-Z][A-Z0-9]+-[0-9]+$ ]] && die "work sources ($r) come in phase 2"
+    r=$(norm_ref "$r") || exit 1
+    conf_set --arg r "$r" '.watch.mrs = (.watch.mrs + [$r] | unique) | .watch.ignore -= [$r]'
+    echo "Watching $r"
+  done
+}
+
+cmd_remove() {
+  init_config
+  [[ $# -gt 0 ]] || die "use: mr-watch remove <ref>…"
+  local r
+  for r in "$@"; do
+    r=$(norm_ref "$r") || exit 1
+    # also ignore it, so the API search doesn't bring it back
+    conf_set --arg r "$r" '.watch.mrs -= [$r] | .watch.chains |= map(. - [$r] | select(length > 1))
+                           | .watch.ignore = (.watch.ignore + [$r] | unique)'
+    echo "Stopped watching $r"
+  done
+}
+
+cmd_chain() {
+  init_config
+  if [[ ${1:-} == clear ]]; then
+    if [[ -n ${2:-} ]]; then
+      local r; r=$(norm_ref "$2") || exit 1
+      conf_set --arg r "$r" '.watch.chains |= map(select(index([$r]) == null))'
+    else
+      conf_set '.watch.chains = []'
+    fi
+    echo "Chain cleared."; return
+  fi
+  [[ $# -ge 2 ]] || die "use: mr-watch chain <ref> <ref>… | chain clear [<ref>]"
+  local refs=() r
+  for r in "$@"; do refs+=("$(norm_ref "$r")") || exit 1; done
+  conf_set --args '.watch.chains = ([.watch.chains[] | . - $ARGS.positional | select(length > 1)] + [$ARGS.positional])
+                   | .watch.ignore -= $ARGS.positional' "${refs[@]}"
+  echo "Chain: $(IFS=' '; echo "${refs[*]}" | sed 's/ / → /g')"
+}
+
+cmd_voice() {
+  if [[ ${1:-} == test ]]; then
+    say "New approval on 101 from Anna. 4 of 5 approved."
+  else
+    voice_help
+  fi
+}
+
+usage() {
+  cat <<'EOF'
+mr-watch – spoken GitLab MR and GitHub PR updates
+
+  mr-watch on | off            start / stop the LaunchAgent (off survives reboot)
+  mr-watch quiet [60m|2h|off]  mute on top of the speaking hours
+  mr-watch status              poll now, print and speak what's up
+  mr-watch add <ref>…          watch an MR (group/project!123, owner/repo#123, !123, #123, URL)
+  mr-watch remove <ref>…       stop watching an MR (also hides it from the API search)
+  mr-watch chain <ref> <ref>…  set a merge order; "chain clear [<ref>]" removes it
+  mr-watch voice [test]        how to change the voice; "test" speaks a sample
+  mr-watch tick                one poll – what launchd runs
+
+Config: ~/.config/mr-watch/config.json   State and log: ~/.local/state/mr-watch/
+EOF
+}
+
+case "${1:-}" in
+  on) cmd_on ;;
+  off) cmd_off ;;
+  quiet) shift; cmd_quiet "$@" ;;
+  status) cmd_status ;;
+  add) shift; cmd_add "$@" ;;
+  remove) shift; cmd_remove "$@" ;;
+  chain) shift; cmd_chain "$@" ;;
+  voice) shift; cmd_voice "$@" ;;
+  tick) [[ ${2:-} == --now ]] && cmd_tick force || cmd_tick ;;
+  ""|-h|--help|help) usage ;;
+  *) usage >&2; exit 1 ;;
+esac
