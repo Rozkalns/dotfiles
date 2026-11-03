@@ -36,7 +36,7 @@ init_config() {
     speak_hours: {days: "1-5", from: "08:00", to: "19:00"},
     interval_minutes: 3,
     forges: $ARGS.positional,
-    watch: {own_open_mrs: true, review_requests: true, mrs: [], chains: [], sources: [], ignore: []}
+    watch: {own_open_mrs: true, review_requests: true, mrs: [], chains: [], ignore: []}
   }' "${forges[@]}" >"$CONF"
 }
 
@@ -274,6 +274,13 @@ poll() {
     snaps=$(jq --arg r "$ref" --arg role "$role" --argjson s "$snap" '.[$r] = ($s + {role: $role})' <<<"$snaps")
   done < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' <<<"$roles")
 
+  # a bare number only for the repo watched most; others are spoken as "kartites 798"
+  snaps=$(jq '
+    def repo: split("[!#]"; null)[0];
+    ([keys[] | repo] | group_by(.) | max_by(length) | .[0] // "") as $main
+    | with_entries(.value.label = (if (.key | repo) == $main then .value.num
+                                   else "\(.key | repo | split("/") | last) \(.value.num)" end))' <<<"$snaps")
+
   EVENTS=$(jq -n --argjson prev "$(jq '.mrs // {}' <<<"$STATE_JSON")" --argjson cur "$snaps" \
     --argjson first "$first_run" --slurpfile c "$CONF" '
     def names: if length == 1 then .[0] elif length == 2 then "\(.[0]) and \(.[1])"
@@ -284,7 +291,7 @@ poll() {
         | if $n.role == "review" then
             select($n.state == "open" and ($n.i_approved | not) and $n.me_reviewer != false
                    and ($p == null or ($p.me_reviewer | not)))
-            | {type: "review", text: "\($n.author_name) asked you to review \($n.num). Worth a look."}
+            | {type: "review", text: "\($n.author_name) asked you to review \($n.label). Worth a look."}
           elif $p == null then empty
           elif $p.state == "open" and $n.state == "merged" then
             ([$chains[] | select(index([$ref]) != null)] | first // null) as $ch
@@ -292,10 +299,10 @@ poll() {
                else ($ch | index([$ref])) as $i
                  | ($ch[$i + 1:] | map(select(($cur[.].state // "open") == "open"))) as $rest
                  | if ($rest | length) == 0 then " The chain is done."
-                   elif $cur[$rest[0]].ready then " \($cur[$rest[0]].num // ($rest[0] | split("[!#]"; null) | last)) is next and ready to merge."
-                   else " Next in the chain is \($cur[$rest[0]].num // ($rest[0] | split("[!#]"; null) | last))." end
+                   elif $cur[$rest[0]].ready then " \($cur[$rest[0]].label // ($rest[0] | split("[!#]"; null) | last)) is next and ready to merge."
+                   else " Next in the chain is \($cur[$rest[0]].label // ($rest[0] | split("[!#]"; null) | last))." end
                end) as $tail
-            | {type: "merged", text: "\($n.num) is merged.\($tail)"}
+            | {type: "merged", text: "\($n.label) is merged.\($tail)"}
           elif $n.state != "open" then empty
           else
             (($n.approvers - $p.approvers) as $new
@@ -304,17 +311,17 @@ poll() {
                 elif $n.approvals_left > 0 then " \($n.approved_count) of \($n.approved_count + $n.approvals_left) approved."
                 elif ($n.ready and ($p.ready | not)) then ""
                 else " Fully approved." end) as $count
-             | if ($new | length) == 1 then {type: "approval", n: 1, text: "New approval on \($n.num) from \($new[0]).\($count)"}
-               else {type: "approval", n: ($new | length), text: "\($new | names) approved \($n.num).\($count)"} end),
-            (select($n.ready and ($p.ready | not)) | {type: "ready", text: "\($n.num) is ready to merge."}),
-            (select($n.pipeline == "failed" and $p.pipeline != "failed") | {type: "failed", text: "Pipeline failed on \($n.num)."}),
+             | if ($new | length) == 1 then {type: "approval", n: 1, text: "New approval on \($n.label) from \($new[0]).\($count)"}
+               else {type: "approval", n: ($new | length), text: "\($new | names) approved \($n.label).\($count)"} end),
+            (select($n.ready and ($p.ready | not)) | {type: "ready", text: "\($n.label) is ready to merge."}),
+            (select($n.pipeline == "failed" and $p.pipeline != "failed") | {type: "failed", text: "Pipeline failed on \($n.label)."}),
             (($p.notes | map(.id)) as $old
              | [$n.notes[] | select(.id as $i | $old | index([$i]) | not)] as $fresh
              | select(($fresh | length) > 0)
              | ($fresh | map(.who) | unique) as $who
              | {type: "comment", n: ($fresh | length),
-                text: (if ($who | length) > 2 then "\($who | length) people commented on \($n.num)."
-                       else "\($who | names) commented on \($n.num)." end)})
+                text: (if ($who | length) > 2 then "\($who | length) people commented on \($n.label)."
+                       else "\($who | names) commented on \($n.label)." end)})
           end
       ] end')
 
@@ -421,7 +428,7 @@ cmd_status() {
   summary=$(jq -r '
     .mrs | map(select(.state == "open")) as $o
     | ($o | map(select(.role != "review"))) as $mine
-    | ($mine | map(select(.ready)) | map(.num)) as $ready
+    | ($mine | map(select(.ready)) | map(.label)) as $ready
     | ($o | map(select(.role == "review" and (.i_approved | not))) | length) as $rev
     | "\($mine | length) open merge requests."
       + (if ($ready | length) > 0 then " Ready to merge: \($ready | join(", "))." else "" end)
@@ -505,7 +512,6 @@ cmd_add() {
   [[ $# -gt 0 ]] || die "use: mr-watch add <ref>…"
   local r
   for r in "$@"; do
-    [[ $r =~ ^[A-Z][A-Z0-9]+-[0-9]+$ ]] && die "work sources ($r) come in phase 2"
     r=$(norm_ref "$r") || exit 1
     conf_set --arg r "$r" '.watch.mrs = (.watch.mrs + [$r] | unique) | .watch.ignore -= [$r]'
     echo "Watching $r"

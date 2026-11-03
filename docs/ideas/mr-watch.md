@@ -4,7 +4,7 @@
 
 While waiting for reviews, I keep opening GitLab to check whether my merge requests got approved. A temporary `say` loop in a Claude session showed that hearing "New approval on 101. 4 of 5 approved." is both useful and fun. But it lived only as long as the Claude session was open, and it watched a hard-coded list of MRs.
 
-At work I use GitLab and Jira. On my own projects I use GitHub, with GitHub Projects, backlog items (`docs/backlog/`) or OpenSpec changes instead of Jira. The watcher must work with both.
+At work I use GitLab. On my own projects I use GitHub. The watcher must work with both.
 
 ## What
 
@@ -33,7 +33,6 @@ On GitHub there is no "N of M approved" count, so it says "2 approvals" instead.
 - MRs where I'm a reviewer and haven't approved yet.
 - Extra MRs added by hand (anyone's).
 - Chains: a merge order I define by hand (see below).
-- Later: groups of MRs found from a work source (see phase 2).
 
 ### Chains
 
@@ -61,8 +60,8 @@ One CLI; the Claude skill and the terminal call the same commands:
 mr-watch on | off            # launchctl enable+bootstrap / bootout+disable (off survives reboot)
 mr-watch quiet [60m|2h|off]  # mute on top of the speaking hours
 mr-watch status              # speak + print what's up now
-mr-watch add <ref> | <source>
-mr-watch remove <…>
+mr-watch add <ref>…
+mr-watch remove <ref>…
 mr-watch chain <ref> <ref> … # set a merge order
 mr-watch chain clear [<ref>] # remove one chain (the one holding <ref>) or all
 mr-watch voice [test]        # how to change the voice; test speaks a sample
@@ -78,12 +77,12 @@ mr-watch tick [--now]        # one poll – what launchd runs; --now skips the o
     "speak_hours": {"days": "1-5", "from": "08:00", "to": "19:00"},
     "interval_minutes": 3,
     "forges": ["gitlab", "github"],
+    "gitlab_host": "gitlab.example.com",
     "watch": {
       "own_open_mrs": true,
       "review_requests": true,
       "mrs": [],
       "chains": [["acme/app!7360", "acme/app!7327", "acme/app!7380", "acme/app!7393"]],
-      "sources": [],
       "ignore": []
     }
   }
@@ -95,14 +94,14 @@ mr-watch tick [--now]        # one poll – what launchd runs; --now skips the o
 
   | | GitLab (`glab api`) | GitHub (`gh`) |
   |---|---|---|
-  | My MRs | `merge_requests?author_username=me&state=opened&scope=all` | `gh search prs --author=@me --state=open --draft=false` |
+  | My MRs | `merge_requests?author_username=me&state=opened&scope=all` | `gh search prs --author=@me --state=open`, drafts dropped with `jq` |
   | Review requests | `merge_requests?reviewer_username=me&state=opened` | `gh search prs --review-requested=@me --state=open` |
   | Approvals | `…/approvals` (`approved_by`, `approvals_left`) | reviews with state `APPROVED`, latest per user |
   | Ready to merge | `detailed_merge_status == "mergeable"` | `mergeStateStatus == "CLEAN"` |
   | Pipeline | `head_pipeline.status` | `statusCheckRollup` |
   | Comments | notes with `system: false` | issue comments + review comments |
 
-  A forge is skipped when its CLI isn't logged in. Each CLI reads its own host and token, so the script has no hosts, names or tokens.
+  A forge is skipped when its CLI isn't logged in. Each CLI reads its own token, so the script has no hosts, names or tokens. The one exception: launchd doesn't pass on the shell's `GITLAB_HOST`, so `gitlab_host` is copied from it into the config when the config is created, and `tick` exports it again.
 - **State:** `~/.local/state/mr-watch/state.json` (last seen approvals, pipelines, note ids, queued events, last poll time). It is kept apart from the config, so a config change never replays old events.
 - **launchd:** a LaunchAgent in `~/Library/LaunchAgents` runs `mr-watch tick` every 60 s, only while I'm logged in (needed for `say`). `tick` returns at once if less than `interval_minutes` has passed since the last poll, so the plist is written once and never changes. The plist sets `PATH` to include `/opt/homebrew/bin` for `glab` and `gh`. On/off only loads and unloads it.
 - **Voice:** `say` uses the System voice, so mr-watch has no voice setting. `mr-watch voice` prints how to change it (System Settings → Accessibility → Spoken Content → System voice), and `mr-watch on` prints the same steps the first time.
@@ -122,12 +121,6 @@ mr-watch tick [--now]        # one poll – what launchd runs; --now skips the o
 - Sort approver names before comparing. The API returned the same two approvers in a different order, and the prototype announced a "new approval" that wasn't new.
 - Announce only the newly added approver, not the whole list.
 
-## Phases
+## Scope
 
-1. CLI + config + LaunchAgent + skill: GitLab and GitHub adapters, own MRs, extra MRs, review requests, chains, all events, mute and speaking hours.
-2. Sources – a group of MRs found from a work item:
-   - Jira epic through `acli`: every MR of its child tickets, found by the ticket key in the MR title or branch. First check that `acli` works when launchd runs it.
-   - GitHub Project through `gh project item-list`: the PRs linked to its items.
-   - Backlog item (`docs/backlog/<slug>.md`) and OpenSpec change (`openspec/changes/<name>/`): PRs whose branch contains the slug or change name.
-
-Matching on the branch name is enough. An item file does not have to list its PRs.
+No work sources (Jira epics, GitHub Projects, backlog items, OpenSpec changes). My own MRs are found by the API, and those already cover an epic I work on. A chain gives the merge order, and `add` covers the odd MR from someone else. A source would add a Jira login under launchd and loose branch matching, for little gain.
