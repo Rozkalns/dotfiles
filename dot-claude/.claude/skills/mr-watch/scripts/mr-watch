@@ -158,6 +158,9 @@ fetch_gitlab() {
         i_approved: any($ap.approved_by[]; .user.username == $me),
         approved_count: ($ap.approved_by | length),
         approvals_left: $ap.approvals_left,
+        blockers: [(select($mr.blocking_discussions_resolved | not) | "open threads"),
+                   (select($mr.has_conflicts) | "merge conflicts"),
+                   (select($p == "failed" or $p == "canceled") | "a failed pipeline")],
         pipeline: (if $p == null then null elif $p == "success" then "success"
                    elif ($p == "failed" or $p == "canceled") then "failed" else "running" end),
         ready: ($st == "open" and ($mr.draft | not) and (
@@ -370,7 +373,8 @@ poll() {
              | (if $n.approvals_left == null then ""
                 elif $n.approvals_left > 0 then " \($n.approved_count) of \($n.approved_count + $n.approvals_left) approved."
                 elif ($n.ready and ($p.ready | not)) then ""
-                else " Fully approved." end) as $count
+                elif ($n.blockers // [] | length) > 0 then " All approvals in, but not mergeable yet: \($n.blockers | names)."
+                else " All approvals in." end) as $count
              | if ($new | length) == 1 then {type: "approval", n: 1, text: "New approval on \($n.label) from \($new[0]).\($count)"}
                else {type: "approval", n: ($new | length), text: "\($new | names) approved \($n.label).\($count)"} end),
             (select($n.ready and ($p.ready | not)) | {type: "ready", text: "\($n.label) is ready to merge."}),
