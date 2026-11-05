@@ -36,11 +36,12 @@ Every forge in `forges` whose CLI (`glab`, `gh`) is logged in. The forges are de
 
 - the user's own open, non-draft MRs;
 - MRs where the user is a reviewer;
+- open, non-draft MRs by the teammates in `watch.authors` (`{"gitlab": ["username", …], "github": [...]}`). Only the new MR is said ("Oskars opened a new MR, 7412."), nothing after it. If the author adds the user as a reviewer, it becomes a normal review request. A newly added author's MRs that are already open are not announced;
 - extra MRs and chains added with the CLI.
 
 A merged extra MR leaves the list. A chain leaves the list when all of its MRs are merged.
 
-Settings the CLI doesn't change (`speak_hours`, `interval_minutes`, `forges`, `own_open_mrs`, `review_requests`) live in `~/.config/mr-watch/config.json`. Edit them with `jq` when the user asks. They take effect on the next tick.
+Settings the CLI doesn't change (`speak_hours`, `interval_minutes`, `forges`, `own_open_mrs`, `review_requests`, `authors`) live in `~/.config/mr-watch/config.json`. Edit them with `jq` when the user asks. They take effect on the next tick.
 
 ## Voice
 

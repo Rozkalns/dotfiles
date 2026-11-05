@@ -36,7 +36,7 @@ init_config() {
     speak_hours: {days: "1-5", from: "08:00", to: "19:00"},
     interval_minutes: 3,
     forges: $ARGS.positional,
-    watch: {own_open_mrs: true, review_requests: true, mrs: [], chains: [], ignore: []}
+    watch: {own_open_mrs: true, review_requests: true, authors: {}, mrs: [], chains: [], ignore: []}
   }' "${forges[@]}" >"$CONF"
 }
 
@@ -116,7 +116,11 @@ discover() {
       if [[ $(conf .watch.review_requests) == true ]]; then
         out=$(glab api "merge_requests?reviewer_username=$me&state=opened&scope=all&per_page=100") || return 1
         jq -r '.[] | select(.draft|not) | "\(.references.full)\treview"' <<<"$out"
-      fi ;;
+      fi
+      for a in $(conf '.watch.authors.gitlab // [] | .[]'); do
+        out=$(glab api "merge_requests?author_username=$a&state=opened&scope=all&per_page=100") || return 1
+        jq -r '.[] | select(.draft|not) | "\(.references.full)\tteam"' <<<"$out"
+      done ;;
     github)
       if [[ $(conf .watch.own_open_mrs) == true ]]; then
         out=$(gh search prs --author=@me --state=open --limit 100 --json repository,number,isDraft) || return 1
@@ -125,7 +129,11 @@ discover() {
       if [[ $(conf .watch.review_requests) == true ]]; then
         out=$(gh search prs --review-requested=@me --state=open --limit 100 --json repository,number,isDraft) || return 1
         jq -r '.[] | select(.isDraft|not) | "\(.repository.nameWithOwner)#\(.number)\treview"' <<<"$out"
-      fi ;;
+      fi
+      for a in $(conf '.watch.authors.github // [] | .[]'); do
+        out=$(gh search prs --author="$a" --state=open --limit 100 --json repository,number,isDraft) || return 1
+        jq -r '.[] | select(.isDraft|not) | "\(.repository.nameWithOwner)#\(.number)\tteam"' <<<"$out"
+      done ;;
   esac
 }
 
@@ -279,7 +287,8 @@ poll() {
     fi
     while IFS=$'\t' read -r ref role; do
       [[ -z $ref ]] && continue
-      roles=$(jq --arg r "$ref" --arg role "$role" '.[$r] = (if .[$r] == "own" then "own" else $role end)' <<<"$roles")
+      # own beats review beats team
+      roles=$(jq --arg r "$ref" --arg role "$role" '.[$r] = (if .[$r] == "own" or .[$r] == "review" and $role == "team" then .[$r] else $role end)' <<<"$roles")
     done <<<"$found"
   done
 
@@ -328,7 +337,7 @@ poll() {
                                    else "\(.key | repo | split("/") | last) ‹\(.value.num)›" end))' <<<"$snaps")
 
   EVENTS=$(jq -n --argjson prev "$(jq '.mrs // {}' <<<"$STATE_JSON")" --argjson cur "$snaps" \
-    --argjson first "$first_run" --slurpfile c "$CONF" '
+    --argjson first "$first_run" --slurpfile c "$CONF" --argjson seeded "$(jq '.authors_seeded // []' <<<"$STATE_JSON")" '
     def names: if length == 1 then .[0] elif length == 2 then "\(.[0]) and \(.[1])"
                else (.[:-1] | join(", ")) + " and " + .[-1] end;
     $c[0].watch.chains as $chains
@@ -338,6 +347,11 @@ poll() {
             select($n.state == "open" and ($n.i_approved | not) and $n.me_reviewer != false
                    and ($p == null or ($p.me_reviewer | not)))
             | {type: "review", text: "\($n.author_name) asked you to review \($n.label). Worth a look."}
+          elif $n.role == "team" then
+            # an author added since the last tick: their open MRs are not news
+            select($n.state == "open" and $p == null
+                   and ($seeded | index([$n.author]) != null))
+            | {type: "opened", text: "\($n.author_name) opened a new MR, \($n.label)."}
           elif $p == null then empty
           elif $p.state == "open" and $n.state == "merged" then
             ([$chains[] | select(index([$ref]) != null)] | first // null) as $ch
@@ -386,7 +400,7 @@ poll() {
   done
 
   STATE_JSON=$(jq --argjson s "$snaps" --argjson d "$down" --argjson t "$(now)" \
-    '.mrs = $s | .down = $d | .last_poll = $t' <<<"$STATE_JSON")
+    --argjson a "$(conf '[.watch.authors[]?[]]')" '.mrs = $s | .down = $d | .last_poll = $t | .authors_seeded = $a' <<<"$STATE_JSON")
 
   # merged extra MRs leave the list; a chain leaves when all of it is merged
   local merged
@@ -411,6 +425,7 @@ catch_up_text() {
           elif .type == "merged" then plural(.n; "merge"; "merges")
           elif .type == "failed" then plural(.n; "failed pipeline"; "failed pipelines")
           elif .type == "review" then plural(.n; "review request"; "review requests")
+          elif .type == "opened" then plural(.n; "new team MR"; "new team MRs")
           elif .type == "ready" then "\(.n) ready to merge"
           else empty end)
     | if length == 0 then "" else "While you were away: " + join(", ") + "." end' <<<"$1"
@@ -490,7 +505,7 @@ cmd_status() {
   local summary
   summary=$(jq -r '
     .mrs | map(select(.state == "open")) as $o
-    | ($o | map(select(.role != "review"))) as $mine
+    | ($o | map(select(.role == "own" or .role == "extra"))) as $mine
     | ($mine | map(select(.ready)) | map(.label)) as $ready
     | ($o | map(select(.role == "review" and (.i_approved | not))) | length) as $rev
     | "\($mine | length) open merge requests."
