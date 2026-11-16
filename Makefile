@@ -1,4 +1,4 @@
-.PHONY: all macos linux link hooks core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync additional migrate
+.PHONY: all macos linux link hooks skills core brew themes dock defaults duti phpstorm topgrade-agent motd git-setup pdf help test sync additional migrate
 
 # Detect OS
 UNAME := $(shell uname -s)
@@ -16,7 +16,7 @@ STOW := stow --ignore='\.DS_Store'
 all: $(OS)
 
 # macOS installation
-macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent pdf migrate
+macos: core brew link hooks skills themes dock defaults duti phpstorm topgrade-agent pdf migrate
 	@echo "✅ macOS dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -24,7 +24,7 @@ macos: core brew link hooks themes dock defaults duti phpstorm topgrade-agent pd
 	@echo ""
 
 # Linux installation
-linux: core brew link hooks motd migrate
+linux: core brew link hooks skills motd migrate
 	@echo "✅ Linux dotfiles installation complete!"
 	@echo ""
 	@echo "To activate your new shell configuration:"
@@ -61,6 +61,20 @@ link:
 	fi
 	@$(STOW) -t "$$HOME/.config" config
 	@echo "✅ Symlinks created"
+
+# Third-party agent skills, fetched from upstream with the Skills CLI (skills.sh)
+# so they stay current instead of going stale as a vendored copy. With only
+# --agent claude-code they are copied into ~/.claude/skills (a real dir, so no
+# clash with the per-skill stow symlinks). Re-run to update. Node comes from Herd, not
+# Homebrew, so skip with a warning when npx is not there yet.
+skills:
+	@echo "==> Installing third-party agent skills..."
+	@if command -v npx >/dev/null 2>&1; then \
+		npx -y skills add https://github.com/cloudflare/security-audit-skill \
+			--skill security-audit --global --agent claude-code --yes; \
+	else \
+		echo "  ⚠️  npx not found; install Node (Herd), then run 'make skills'"; \
+	fi
 
 # Install git hooks into whichever directory git actually reads.
 # core.hooksPath — set globally so the pre-push secret guard applies everywhere —
@@ -218,6 +232,7 @@ help:
 	@echo "  make linux        Install for Linux"
 	@echo "  make link         Create symlinks only"
 	@echo "  make hooks        Install git hooks"
+	@echo "  make skills       Install third-party agent skills (needs npx)"
 	@echo "  make brew         Install Homebrew packages only"
 	@echo "  make themes       Install Catppuccin themes only"
 	@echo "  make dock         Setup Dock only (macOS)"
