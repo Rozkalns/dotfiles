@@ -23,9 +23,8 @@ cleanup = true
 # "npm" = "npm update --location global --force"
 
 [brew]
-# Automatically upgrade outdated casks (even those with auto-update like PhpStorm, Rectangle, Raycast)
-# Uses --greedy flag (or -a with brew-cask-upgrade)
-greedy_cask = true
+# Off: greedy casks are listed in HOMEBREW_UPGRADE_GREEDY_CASKS (zsh.d/10-homebrew.zsh), minus phpstorm
+greedy_cask = false
 
 # Clean up old versions after upgrade
 autoremove = true
