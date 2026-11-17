@@ -1,6 +1,6 @@
 ---
 name: error-report
-description: "Debug a failed request from its request ID, in a Laravel app that stamps prefixed request IDs (AssignRequestId middleware, app.server_code). Use whenever a message holds an error-page block — 'Pieprasījuma ID:' / 'Request ID:' with 'Laiks', 'Adrese', 'Lietotājs', 'Loma' lines — even when no question comes with it, or an ID like SRVAPP-K7Q2M9X4TB, a screenshot of an error page, or 'I get a 500 / 403 / 419 on …'. The block means: find that request in the server log, the audit log and GlitchTip, explain what failed and fix it."
+description: "Debug a failed request from its request ID, in a Laravel app that stamps prefixed request IDs (the rozkalns/laravel-request-id package). Use whenever a message holds an error-page block — 'Pieprasījuma ID:' / 'Request ID:' with 'Laiks', 'Adrese', 'Lietotājs', 'Loma' lines — even when no question comes with it, or an ID like SRVAPP-K7Q2M9X4TB, a screenshot of an error page, or 'I get a 500 / 403 / 419 on …'. The block means: find that request in the server log, the audit log and GlitchTip, explain what failed and fix it."
 ---
 
 # Error report
@@ -14,17 +14,26 @@ rules out a one-off (and, minutes after a deploy, points at step 5); it is not a
 
 ## 0. Is this project set up for it?
 
-Request IDs are a per-app feature, not a fleet default. Check the current project has both
-`app/Http/Middleware/AssignRequestId.php` and an `app.server_code` key in `config/app.php`. If not,
-say in one line that this app has no request-ID tracing, then debug the report the usual way (path,
-time, daily log around that minute). Do not go looking on a server for an ID this app never wrote.
+Request IDs come from the `rozkalns/laravel-request-id` package. Check the current project has it
+in `composer.json` and a published `config/request-id.php` (its `project_code` is this app's code).
+If not, say in one line that this app has no request-ID tracing, then debug the report the usual
+way (path, time, daily log around that minute). Do not go looking on a server for an ID this app
+never wrote.
 
 ```
-Pieprasījuma ID: SRVAPP-K7Q2M9X4TB      ← the key to everything below
-Laiks: 29.10.2026 12:25:50             ← Europe/Riga; the log is in UTC
+Pieprasījuma ID: SRVAPP-K7Q2M9X4TB      ← the key to everything below ("Request ID" in English)
+Laiks: 29.10.2026 12:25:50             ← request-id.timezone (Europe/Riga in the fleet); the log is in UTC
 Adrese: /bookings/01m5…                ← path without query; link tokens show as …
-Lietotājs: …   Loma: …                 ← who saw it (signed in only); "Īstais konts" = impersonation
+Lietotājs: …   Loma: …                 ← only where the app binds viewer rows; "Īstais konts" = impersonation
 ```
+
+The ID, time and path come from the package and are on every app's block. Further lines come from
+the app's own `ErrorPageViewer`; an app that binds none shows just those three.
+
+What the app logs on top of the ID is app code, not the package. Check before relying on it:
+`rg -l "AccessDenied|Access denied" app/` for a 403 line, `rg -l activity_log database/` for an
+audit log. An app with neither has nothing under a 403, 404 or 419 ID, only under a 500 (the
+exception) or any line the request wrote itself.
 
 ## 1. Decode the ID
 
@@ -35,8 +44,9 @@ URL. Use them as written there (absolute paths).
 
 - **`XXX` server code** = a local or CI run, never a server. Look in this checkout's
   `storage/logs/`, not on a server.
-- **No prefix (10 characters only)** = written before the prefix shipped (2026-10-29): this app on
-  the server that was live then (see `projects.yaml`).
+- **No prefix (10 characters only)** = written before the prefix shipped (2026-10-29). Only the
+  first app with request IDs has such IDs; the other apps had no IDs before the package
+  (2026-11-17), so an unprefixed ID points at that one app on the server that was live then.
 - An unknown code: ask, do not guess. A new server must be added to `projects.yaml` first.
 - Keep real codes out of repo files, commits and PRs (examples use `SRVAPP`). The prefix is
   meant to tell us where an ID came from and tell an outsider nothing; that only holds while the
@@ -47,8 +57,9 @@ Commands and jobs get IDs too, and a job queued by a request keeps the request's
 
 ## 2. Server log
 
-Daily files: `storage/logs/laravel-YYYY-MM-DD.log`, named by the **UTC** date (production runs
-`LOG_STACK=daily`; its `laravel.log` is a stale leftover). Convert `Laiks` from Riga time first
+Daily files: `storage/logs/laravel-YYYY-MM-DD.log`, named by the **UTC** date, where the site runs
+`LOG_STACK=daily` (then its `laravel.log` is a stale leftover). A site still on `single` writes
+only `laravel.log`: `ls <path>/storage/logs/` tells which. Convert `Laiks` from Riga time first
 (UTC+3 in summer, UTC+2 in winter); near midnight check both days.
 
 The ID sits on the **last** line of an entry. An exception's message and file:line are on the
@@ -63,7 +74,7 @@ the two commands in this skill are on that list. If a command is blocked, ask Ro
 or hand over a one-liner to paste. Do not reword a command to get past the hook: it is the only
 guard between a session and production, so a workaround removes the protection, not the prompt.
 
-What the lines mean:
+What the lines mean (only the first is there in every app; the others are app code, see step 0):
 - `production.ERROR` with an exception: the 500. The first line gives class, message, file:line.
 - `Access denied` (notice): a 403, with `ability`, `model`, `model_key` when a policy refused, and
   `referrer_route`: the page the user came from (`external` = another site), so "how did they get
@@ -72,6 +83,8 @@ What the lines mean:
 - `Validation failed` (info): rule names per field, never values.
 
 ## 3. Audit log
+
+Only for an app with an audit log (step 0); skip this step otherwise.
 
 What happened around the request: the audit entries a few minutes before and after `Laiks`, with
 `request_id` as a column so the request's own entries stand out. Only a request that changed
@@ -97,9 +110,11 @@ A 500 also has a GlitchTip event tagged `request_id`. Open the site's `glitchtip
 ## 5. Was it a deploy?
 
 Compare `Laiks` with the live commit and the merge time: `git -C <path>/current
-rev-parse HEAD` (allowed unattended), then `git log` locally. An error in the first minutes after
-a deploy is often a stale compiled view, not the code: see the stale-Livewire incidents in
-`~/code/server/incidents/`.
+rev-parse HEAD` (allowed unattended; a site with `zero_downtime: false` has no `current`, use
+`<path>`), then `git log` locally. An error in the first minutes after a deploy is often a stale
+compiled view, not the code: see the stale-Livewire incidents in `~/code/server/incidents/`. On an
+in-place site an error during the deploy itself can be the gap between `git pull` and
+`composer install`: new code that needs a package not installed yet.
 
 ## 6. Reproduce and fix
 
