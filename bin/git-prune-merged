@@ -5,11 +5,13 @@
 # The forge is picked from the origin URL: GitHub via `gh`, GitLab via `glab` (both need jq).
 #
 # Usage: git prune-merged [-n] [-y] [-w] [-s] [--closed] [-h]
+#        git prune-merged --restore <branch>
 #   -n, --dry-run   only print the plan
 #   -y, --yes       delete without asking
 #   -w, --worktrees also remove linked worktrees whose branch would be deleted
 #   -s, --stashes   also drop stashes whose changes are already in the default branch
 #   --closed        also delete branches whose MR/PR was closed without merge
+#   --restore <b>   recreate branch <b> from its newest backup line for this repo
 #   -h              show this help (`git prune-merged --help` is taken by git, which looks
 #                   for a man page that does not exist)
 #   Short flags can be combined: -nw is -n -w.
@@ -18,10 +20,16 @@
 #   merged      its tip is an ancestor of origin/<default>
 #   in-base     merging it into origin/<default> changes nothing
 #   mr-merged   its MR/PR is merged and the local tip has no commits after the MR/PR head
+#   mr-merged+landed  its MR/PR is merged and every commit after the MR/PR head is already
+#               in origin/<default> under another SHA
 #   mr-closed   its MR/PR is closed (only with --closed)
+# The MR/PR is found by the branch name, then by its upstream branch name, then by the
+# commit at its tip, so a branch pushed under another name (HEAD:other) is found too.
 # A branch kept because of its MR/PR (merged but with later commits, or closed without
 # --closed) is listed with those commits; one whose patch already landed under another SHA
 # is marked "same patch already in origin/<default>".
+# Worktree entries whose folder no longer exists are pruned first (`git worktree prune`);
+# with -n they are only listed.
 # Never touched: the default branch, the current branch, the main worktree's branch.
 # A branch checked out in a linked worktree is only listed, unless -w is given. With -w its
 # worktree is removed first, but only when it is unlocked and has no changes or untracked
@@ -52,22 +60,62 @@ for arg in "$@"; do
   esac
 done
 
-for arg in ${args[@]+"${args[@]}"}; do
-  case "$arg" in
+restore_branch=""
+set -- ${args[@]+"${args[@]}"}
+while [ $# -gt 0 ]; do
+  case "$1" in
     -n|--dry-run) dry_run=1 ;;
     -y|--yes) assume_yes=1 ;;
     -w|--worktrees) include_worktrees=1 ;;
     -s|--stashes) include_stashes=1 ;;
     --closed) include_closed=1 ;;
-    -h|--help) sed -n '3,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "unknown option: $arg" >&2; exit 2 ;;
+    --restore)
+      [ $# -ge 2 ] || { echo "--restore needs a branch name" >&2; exit 2; }
+      restore_branch=$2; shift ;;
+    -h|--help) awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "$0"; exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
+  shift
 done
 
 git rev-parse --git-dir >/dev/null
 
+# The main worktree's name, so a run from a linked worktree uses the same backup file.
+backup_dir="$HOME/.local/share/git-branch-backups"
+repo_name=$(basename "$(git worktree list --porcelain | sed -n '1s#^worktree ##p')")
+
+if [ -n "$restore_branch" ]; then
+  if git show-ref --verify --quiet "refs/heads/$restore_branch"; then
+    echo "branch $restore_branch already exists" >&2; exit 1
+  fi
+  # Files are named <repo>-<YYYY-MM-DD>.txt, so a name sort is a date sort; the last match wins.
+  restore_sha=""
+  for f in "$backup_dir/$repo_name"-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].txt; do
+    [ -f "$f" ] || continue
+    found=$(awk -v b="$restore_branch" '$2 == b && NF == 2 { sha = $1 } END { print sha }' "$f")
+    [ -n "$found" ] && { restore_sha=$found; restore_file=$f; }
+  done
+  [ -n "$restore_sha" ] || { echo "no backup of $restore_branch in $backup_dir/$repo_name-*.txt" >&2; exit 1; }
+  git cat-file -e "$restore_sha^{commit}" 2>/dev/null ||
+    { echo "commit $restore_sha (from $restore_file) is no longer in this repo" >&2; exit 1; }
+  git branch "$restore_branch" "$restore_sha"
+  echo "Restored $restore_branch at $(git rev-parse --short "$restore_sha") (from $restore_file)"
+  exit 0
+fi
+
 echo "Fetching origin..."
 git fetch --prune --quiet origin
+
+# Entries for worktree folders that are gone (a cleared /tmp, a deleted checkout) would
+# otherwise keep their branch listed forever. Pruning them touches no files.
+stale_worktrees=$(git worktree prune --dry-run --verbose 2>&1 || true)
+if [ -n "$stale_worktrees" ]; then
+  if [ "$dry_run" -eq 1 ]; then
+    printf '%s\n' "$stale_worktrees" | sed 's/^/would prune: /' >&2
+  else
+    git worktree prune --verbose 2>&1 | sed 's/^/pruned: /' >&2
+  fi
+fi
 
 default_branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
 default_branch=${default_branch:-master}
@@ -105,25 +153,104 @@ else
   echo "No logged-in gh or glab for $origin_host – skipping the MR/PR check (squash merges will be kept)." >&2
 fi
 
-# Prints the merged MR/PR head SHA, "closed", or nothing.
-mr_state() {
+# GitHub: the PRs of every local branch name, upstream name and tip commit, fetched up front
+# in one GraphQL query with one alias each, instead of one `gh` call per branch (0.8 s each).
+# It runs here, not inside mr_state, because mr_state is called in a $(...) subshell and a
+# cache filled there would be lost after each branch. On failure pr_cache stays empty and
+# every branch is looked up on its own.
+pr_cache=""
+if [ "$forge" = "github" ]; then
+  pr_names=$( { git for-each-ref --format="%(refname:short)" refs/heads
+    git for-each-ref --format="%(upstream:short)" refs/heads | sed -n "s#^origin/##p"; } | sort -u)
+  pr_tips=$(git for-each-ref --format="%(objectname)" refs/heads | sort -u)
+  pr_query=$(jq -nr --arg path "$origin_path" --arg names "$pr_names" --arg tips "$pr_tips" '
+    ($path | split("/")) as [$owner, $name]
+    | ([$names | splits("\n") | select(. != "")] | to_entries
+        | map("b\(.key): pullRequests(headRefName: \(.value | tojson), first: 20, states: [OPEN, CLOSED, MERGED]) { nodes { state headRefOid } }"))
+    + ([$tips | splits("\n") | select(. != "")] | to_entries
+        | map("c\(.key): object(oid: \(.value | tojson)) { ... on Commit { associatedPullRequests(first: 20) { nodes { state headRefOid } } } }"))
+    | "query { repository(owner: \($owner | tojson), name: \($name | tojson)) { \(join(" ")) } }"')
+  if pr_response=$(gh api graphql --hostname "$origin_host" -f query="$pr_query" 2>/dev/null); then
+    pr_cache=$(jq -n --argjson r "$pr_response" --arg names "$pr_names" --arg tips "$pr_tips" '
+      def norm: [.[]? | {state: (.state | ascii_downcase), sha: .headRefOid}];
+      $r.data.repository as $repo
+      | {names: ([$names | splits("\n") | select(. != "")] | to_entries
+                 | map({key: .value, value: ($repo["b\(.key)"].nodes | norm)}) | from_entries),
+         commits: ([$tips | splits("\n") | select(. != "")] | to_entries
+                 | map({key: .value, value: ($repo["c\(.key)"].associatedPullRequests.nodes | norm)}) | from_entries)}' 2>/dev/null) || pr_cache=""
+  fi
+fi
+
+# Reads a list of MRs/PRs normalised to {state: merged|closed|open, sha} and prints the
+# merged head SHA, "closed" when all are closed, or nothing.
+pick_state() {
+  jq -r '
+    (map(select(.state == "merged")) | first | .sha) //
+    (if length > 0 and all(.state == "closed") then "closed" else empty end)'
+}
+
+# Prints the state for MRs/PRs whose source branch is $1.
+mr_state_by_name() {
   local encoded response
   case "$forge" in
     github)
+      if [ -n "$pr_cache" ]; then
+        printf '%s' "$pr_cache" | jq --arg b "$1" '.names[$b] // []' | pick_state
+        return 0
+      fi
       response=$(gh pr list --repo "$origin_host/$origin_path" --head "$1" --state all --limit 20 \
         --json state,headRefOid 2>/dev/null) || return 0
-      printf '%s' "$response" | jq -r '
-        (map(select(.state == "MERGED")) | first | .headRefOid) //
-        (if length > 0 and all(.state == "CLOSED") then "closed" else empty end)'
+      printf '%s' "$response" | jq '[.[] | {state: (.state | ascii_downcase), sha: .headRefOid}]' | pick_state
       ;;
     gitlab)
       encoded=$(printf '%s' "$1" | jq -sRr @uri)
       response=$(glab api "projects/:id/merge_requests?source_branch=$encoded&state=all&per_page=20" 2>/dev/null) || return 0
-      printf '%s' "$response" | jq -r '
-        (map(select(.state == "merged")) | first | .sha) //
-        (if length > 0 and all(.state == "closed") then "closed" else empty end)'
+      printf '%s' "$response" | jq '[.[] | {state, sha}]' | pick_state
       ;;
   esac
+}
+
+# Prints the state for MRs/PRs that contain commit $1. Fails quietly for unpushed commits.
+mr_state_by_commit() {
+  local response
+  case "$forge" in
+    github)
+      if [ -n "$pr_cache" ]; then
+        printf '%s' "$pr_cache" | jq --arg c "$1" '.commits[$c] // []' | pick_state
+        return 0
+      fi
+      response=$(gh api "repos/$origin_path/commits/$1/pulls" 2>/dev/null) || return 0
+      printf '%s' "$response" | jq '[.[] | {state: (if .merged_at then "merged" else .state end), sha: .head.sha}]' | pick_state
+      ;;
+    gitlab)
+      response=$(glab api "projects/:id/repository/commits/$1/merge_requests" 2>/dev/null) || return 0
+      printf '%s' "$response" | jq '[.[] | {state, sha}]' | pick_state
+      ;;
+  esac
+}
+
+# Prints the merged MR/PR head SHA, "closed", or nothing. Tries the branch name, then the
+# upstream branch name when it differs, then the tip commit.
+mr_state() {
+  local state upstream
+  state=$(mr_state_by_name "$1")
+  if [ -z "$state" ]; then
+    upstream=$(git rev-parse --abbrev-ref "$1@{upstream}" 2>/dev/null || true)
+    upstream=${upstream#origin/}
+    if [ -n "$upstream" ] && [ "$upstream" != "$1" ]; then
+      state=$(mr_state_by_name "$upstream")
+    fi
+  fi
+  [ -z "$state" ] && state=$(mr_state_by_commit "$(git rev-parse "$1")")
+  printf '%s' "$state"
+}
+
+# True when branch $1 has commits after $2 and every one of them is already in the base
+# under another SHA (`git cherry` marks them "-").
+commits_after_all_landed() {
+  local marks
+  marks=$(git cherry "$base" "$1" "$2" 2>/dev/null | cut -c1 | sort -u)
+  [ "$marks" = "-" ]
 }
 
 # Prints the commits on branch $1 after $2 (default: the base), newest first, at most 10.
@@ -174,6 +301,8 @@ while IFS= read -r branch; do
       git cat-file -e "$state^{commit}" 2>/dev/null || git fetch --quiet origin "$state" 2>/dev/null || true
       if git merge-base --is-ancestor "$branch" "$state" 2>/dev/null; then
         reason="mr-merged"
+      elif commits_after_all_landed "$branch" "$state"; then
+        reason="mr-merged+landed"
       else
         echo "keep  $branch – MR/PR merged, but local branch has commits after the MR/PR head:" >&2
         list_commits "$branch" "$state"
@@ -289,13 +418,13 @@ fi
 echo
 for i in "${!delete_names[@]}"; do
   if [ -n "${delete_paths[$i]}" ]; then
-    printf '  %-10s %s  (+ worktree %s)\n' "${delete_reasons[$i]}" "${delete_names[$i]}" "${delete_paths[$i]}"
+    printf '  %-16s %s  (+ worktree %s)\n' "${delete_reasons[$i]}" "${delete_names[$i]}" "${delete_paths[$i]}"
   else
-    printf '  %-10s %s\n' "${delete_reasons[$i]}" "${delete_names[$i]}"
+    printf '  %-16s %s\n' "${delete_reasons[$i]}" "${delete_names[$i]}"
   fi
 done
 for i in "${!stash_shas[@]}"; do
-  printf '  %-10s stash %s %s\n' "${stash_reasons[$i]}" "$(git rev-parse --short "${stash_shas[$i]}")" "${stash_subjects[$i]}"
+  printf '  %-16s stash %s %s\n' "${stash_reasons[$i]}" "$(git rev-parse --short "${stash_shas[$i]}")" "${stash_subjects[$i]}"
 done
 echo
 echo "${#delete_names[@]} branch(es) to delete, $kept kept${listed:+, $listed of them in worktrees (use -w)}."
@@ -330,9 +459,7 @@ if [ ${#branches[@]} -eq 0 ] && [ ${#stash_shas[@]} -eq 0 ]; then
   exit 1
 fi
 
-# The main worktree's name, so a run from a linked worktree writes to the same backup file.
-backup_dir="$HOME/.local/share/git-branch-backups"
-backup_file="$backup_dir/$(basename "$(git worktree list --porcelain | sed -n '1s#^worktree ##p')")-$(date +%F).txt"
+backup_file="$backup_dir/$repo_name-$(date +%F).txt"
 mkdir -p "$backup_dir"
 
 if [ ${#branches[@]} -gt 0 ]; then
