@@ -55,6 +55,19 @@ link:
 	@$(STOW) -t "$$HOME" vim
 	@$(STOW) -t "$$HOME" zsh.d
 	@$(STOW) -t "$$HOME" dot-claude
+	@# Shared agent skills: Codex reads ~/.agents/skills, and dot-claude links each
+	@# one into ~/.claude/skills. Create the folder first so stow links each skill,
+	@# not all of ~/.agents (local skills outside the dotfiles also live there).
+	@mkdir -p "$$HOME/.agents/skills"
+	@$(STOW) -t "$$HOME" dot-agents
+	@# Codex reads global rules only from ~/.codex/AGENTS.md: link it to the shared
+	@# file. A real file there is left alone (the 2026-11-20 migration moves it aside).
+	@mkdir -p "$$HOME/.codex"
+	@if [ -f "$$HOME/.codex/AGENTS.md" ] && [ ! -L "$$HOME/.codex/AGENTS.md" ]; then \
+		echo "  ⚠️  ~/.codex/AGENTS.md is a real file, not linked. Run 'make migrate'."; \
+	else \
+		ln -sfn ../.agents/AGENTS.md "$$HOME/.codex/AGENTS.md"; \
+	fi
 	@if [ ! -f "$$HOME/.claude/settings.local.json" ] && [ -f "$$HOME/.claude/settings.local.json.example" ]; then \
 		cp "$$HOME/.claude/settings.local.json.example" "$$HOME/.claude/settings.local.json"; \
 		echo "  Created ~/.claude/settings.local.json from example (edit for this machine)"; \
@@ -193,6 +206,8 @@ unlink:
 	@$(STOW) -t "$$HOME" -D vim || true
 	@$(STOW) -t "$$HOME" -D zsh.d || true
 	@$(STOW) -t "$$HOME" -D dot-claude || true
+	@$(STOW) -t "$$HOME" -D dot-agents || true
+	@[ "$$(readlink "$$HOME/.codex/AGENTS.md" 2>/dev/null)" = "../.agents/AGENTS.md" ] && rm "$$HOME/.codex/AGENTS.md" || true
 	@$(STOW) -t "$$HOME/.config" -D config || true
 	@echo "✅ Symlinks removed"
 

@@ -109,7 +109,7 @@ mr-watch tick [--now]        # one poll – what launchd runs; --now skips the o
 - **State:** `~/.local/state/mr-watch/state.json` (last seen approvals, pipelines, note ids, queued events, last poll time). It is kept apart from the config, so a config change never replays old events.
 - **launchd:** a LaunchAgent in `~/Library/LaunchAgents` runs `mr-watch tick` every 60 s, only while I'm logged in (needed for `say`). `tick` returns at once if less than `interval_minutes` has passed since the last poll, so the plist is written once and never changes. The plist sets `PATH` to include `/opt/homebrew/bin` for `glab` and `gh`. On/off only loads and unloads it.
 - **Voice:** `say` uses the System voice, so mr-watch has no voice setting. `mr-watch voice` prints how to change it (System Settings → Accessibility → Spoken Content → System voice), and `mr-watch on` prints the same steps the first time.
-- **Skill:** `dot-claude/.claude/skills/mr-watch/` with the script in `scripts/`; `/mr-watch …` just runs the CLI and shows its output.
+- **Skill:** `dot-agents/.agents/skills/mr-watch/` with the script in `scripts/`; `/mr-watch …` just runs the CLI and shows its output.
 
 ### Rules for a correct tick
 

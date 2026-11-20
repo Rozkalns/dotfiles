@@ -49,7 +49,7 @@ Settings the CLI doesn't change (`speak_hours`, `interval_minutes`, `forges`, `o
 
 ## Hotkey for "again"
 
-`raycast/mr-watch-again.sh` is a Raycast script command. To set it up once: Raycast Settings → Extensions → + → Add Script Directory → pick `~/.dotfiles/dot-claude/.claude/skills/mr-watch/raycast`. Then give "Repeat Last MR Update" a hotkey.
+`raycast/mr-watch-again.sh` is a Raycast script command. To set it up once: Raycast Settings → Extensions → + → Add Script Directory → pick `~/.dotfiles/dot-agents/.agents/skills/mr-watch/raycast`. Then give "Repeat Last MR Update" a hotkey.
 
 ## When something looks wrong
 

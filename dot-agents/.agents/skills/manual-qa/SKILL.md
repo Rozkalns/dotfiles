@@ -19,9 +19,13 @@ do not `source` it. Use the first of these that exists:
    up one level.
 3. `.claude/manual-qa.env.example`, the committed template.
 
+Then read `~/.claude/manual-qa.env` if it exists: personal settings for every repo (for example
+`QA_FILE_DIR`). It fills only settings that the project file leaves out or blank.
+
 | Setting | Meaning |
 | --- | --- |
-| `QA_TARGET` | `issue` for a GitHub QA issue, `file` for `QA.md` in the worktree root |
+| `QA_TARGET` | `issue` for a GitHub QA issue, `file` for a QA file (see `QA_FILE_DIR`) |
+| `QA_FILE_DIR` | Only for `file`: the folder for the QA file, for example a notes vault. `~` is allowed. Blank: `QA.md` in the worktree root |
 | `QA_PROJECT_OWNER`, `QA_PROJECT_NUMBER` | The GitHub project board for the QA issue. Blank: a plain issue, no board |
 | `QA_PROJECT_STATUS` | The board status that means "waiting for the tester" |
 | `QA_LOGIN` | How the first step logs in |
@@ -97,7 +101,14 @@ site. Mark which steps belong to which PR, so the base PR can merge first.
 
 ### `QA_TARGET=file`
 
-Write `QA.md` in the worktree root and check that the repo git-ignores it. Start with
+Where the file goes:
+
+- `QA_FILE_DIR` blank: `QA.md` in the worktree root. Check that the repo git-ignores it.
+- `QA_FILE_DIR` set: `<QA_FILE_DIR>/<ticket key, else branch>.md`. Create the folder if it is
+  missing. The file is outside the repo, so it needs no git-ignore. Give the user the full path. If
+  the file exists, it is an earlier round of the same change: update it, do not overwrite it.
+
+Start with
 `# QA — <branch>`, then the `URL:` and `PIN:` lines from the `qa:up` output, then the steps as
 `- [ ]` checkboxes, which the user ticks in their editor. When `qa:up` issues a new PIN, change only
 those two lines.
