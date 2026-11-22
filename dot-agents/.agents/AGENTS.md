@@ -14,6 +14,12 @@
 - **Measure before optimising, and re-measure after.** State the number being improved and the number achieved. A prediction is not a result — and the first thing worth checking is whether the thing you were asked to optimise is actually the bottleneck.
 - **Verify before claiming.** Run the command and quote its output. Say explicitly when a check was skipped, or when a claim is inferred rather than observed.
 - **Steal ideas, not layouts.** When I show another product (screenshots, a link, an app), mine it for ideas: list what it does well, then adapt the good ones to our design system, domain and security rules, and record them (backlog item, spec). Never copy its look. My motto, after Steve Jobs (1996): "Good artists copy; great artists steal."
+  - **Find references yourself, the Mobbin way, for free.** Mobbin MCP is paid, so copy its method, not the subscription. Use the Playwright MCP:
+    1. **Search by task, not by app.** Name the flow ("print a label", "onboard a device", "unlock with 2FA") and pick 3 to 5 real, public products that solve it well. Mix the obvious leaders with niche tools from the same domain.
+    2. **Walk the whole flow, not one screen.** Click through every step, including empty, error and success states, and take a screenshot of each step.
+    3. **Compare sections across products.** Put the same part side by side (header, status list, settings, print view) to see the shared pattern and the one product that does it better.
+    4. **Write it down.** For each reference, record the URL, the step and the idea worth stealing, in a reference list on the backlog item or spec. Then adapt the ideas; never reproduce a screen.
+  - Do not log in to third-party accounts or submit real forms to get a reference. Stop at the public pages, or ask me for screenshots.
 - **Correct your own earlier statements** as soon as a later measurement contradicts them, and say plainly what was wrong. A spec or report left carrying a false claim costs more than the original error did.
 
 ## Writing style
