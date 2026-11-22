@@ -13,6 +13,7 @@
 - **Stop and check in** instead of pressing on: after **two failed attempts** at the same fix, at the **end of a phase** of a multi-phase task, or when the planned approach turns out to be wrong. Report what was learned; don't quietly try a third thing.
 - **Measure before optimising, and re-measure after.** State the number being improved and the number achieved. A prediction is not a result — and the first thing worth checking is whether the thing you were asked to optimise is actually the bottleneck.
 - **Verify before claiming.** Run the command and quote its output. Say explicitly when a check was skipped, or when a claim is inferred rather than observed.
+- **Steal ideas, not layouts.** When I show another product (screenshots, a link, an app), mine it for ideas: list what it does well, then adapt the good ones to our design system, domain and security rules, and record them (backlog item, spec). Never copy its look. My motto, after Steve Jobs (1996): "Good artists copy; great artists steal."
 - **Correct your own earlier statements** as soon as a later measurement contradicts them, and say plainly what was wrong. A spec or report left carrying a false claim costs more than the original error did.
 
 ## Writing style
