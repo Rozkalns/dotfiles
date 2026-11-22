@@ -69,6 +69,10 @@ first line, above the stack trace, so read enough lines before the match:
 ssh <ssh> 'grep -F -B 200 <ID> <path>/storage/logs/laravel-2026-10-29.log'
 ```
 
+`<path>` is the site root from `projects.yaml`. Do not put `current/` in front of `storage/`:
+zero-downtime sites share one `storage/` under the site root, and the guard hook allows exactly
+`/home/forge/<site>/storage/logs/…`, so `…/current/storage/logs/…` is blocked.
+
 Production SSH goes through a guard hook that lets only listed read-only commands run unattended;
 the two commands in this skill are on that list. If a command is blocked, ask Roberts in one sentence
 or hand over a one-liner to paste. Do not reword a command to get past the hook: it is the only
@@ -102,10 +106,41 @@ ssh <ssh> 'sqlite3 -readonly <database> "SELECT id, created_at, request_id, desc
 Select IDs and metadata only. The database holds sensitive personal data, and anything printed
 here leaves the server for an external API, so never select `properties` or any personal field.
 
-## 4. GlitchTip
+## 4. GlitchTip: ask for the event at the start, conclude after
 
-A 500 also has a GlitchTip event tagged `request_id`. Open the site's `glitchtip_url` from
-`projects.yaml` and search the tag `request_id:<ID>`.
+For a 500, the server log holds only the message and stack trace. The GlitchTip event holds the
+request itself: method and URL, the request body (for Livewire: the snapshot with `memo.name`,
+`memo.path` and the property values), headers, `REMOTE_ADDR` and breadcrumbs. Who sent it, from
+which page, and with what payload is usually only there.
+
+There is no GlitchTip API access from this machine. So in the **first** reply on a 500, together
+with the log lookup, ask Roberts for the event: open the site's `glitchtip_url` from
+`projects.yaml`, search the tag `request_id:<ID>`, and paste "copy for AI" or a screenshot of the
+whole event, body and breadcrumbs included. Also note the issue's event count: more than one
+event means a repeat, not a one-off.
+
+Until the event is read, report only what the log shows, and label the rest as open:
+"not seen yet: the GlitchTip event (body, IP, page)". Do not give a cause, a verdict on who sent
+it, or "nothing urgent" before reading it. A conclusion that the event later reverses costs more
+than the wait.
+
+The body can hold personal data. Quote only the fields the diagnosis needs.
+
+**Livewire security errors** (`… is not allowed to be instantiated`, `CorruptComponentPayloadException`):
+- `memo.name` and `memo.path` in the body name the component and page. The changed property is the
+  one with `class` / `s` tuples in it.
+- A `SecurityPolicy` error reached through `fromSnapshot()` means the forged snapshot **passed**
+  the HMAC check, so the sender has the site's `APP_KEY`. The breadcrumb
+  `livewire-checksum-failures:<ip>` = `Missed` confirms zero checksum failures from that IP.
+  Treat it as an incident: rotate the key, and check nginx for requests from that IP that
+  returned 200. A successful exploit creates no GlitchTip event.
+- `REMOTE_ADDR` outside the Cloudflare ranges means the request hit the origin directly.
+
+**Following an attacker IP on the server:** do not write grep/find one-liners. Hand Roberts the
+srv `defense.sh` functions, which are loaded in forge's shell: `web-who <IP>`, `web-hits`,
+`shells-scan`, `shells-tmp`, `shells-cron`, `block-ip <IP>`. They read only the current and `.1`
+logs. For older days, add one `zcat -f /var/log/nginx/*access.log*.gz | grep -aF <IP>` line, and
+keep `-a` (without it, grep skips binary-looking lines).
 
 ## 5. Was it a deploy?
 
