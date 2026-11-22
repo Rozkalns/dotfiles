@@ -1,6 +1,6 @@
 ---
 name: manual-qa
-description: "Set up manual QA for a finished change and write the test steps, in an app with a `composer qa:up` script or a `.claude/manual-qa.env` file. Use as soon as an implementation is done — before the user asks — and whenever they say 'QA', 'let me test it', 'test steps', 'how do I check this', or report a QA finding. Covers `composer qa:up`/`qa:down`, the demo seed, and where the steps go: a GitHub QA issue or a `QA.md` file. Not for the automated browser suite (`composer test:browser`)."
+description: "Set up manual QA for a finished change and write the test steps, in a Laravel app served by Herd (with its own `composer qa:up`, or this skill's `scripts/qa-up.sh`). Use as soon as an implementation is done — before the user asks — and whenever they say 'QA', 'let me test it', 'test steps', 'how do I check this', or report a QA finding. Covers `composer qa:up`/`qa:down` and the shell fallback, the demo seed, and where the steps go: a GitHub QA issue or a `QA.md` file. Not for the automated browser suite (`composer test:browser`)."
 ---
 
 # Manual QA
@@ -32,6 +32,7 @@ Then read `~/.claude/manual-qa.env` if it exists: personal settings for every re
 | `QA_SWITCH_PERSON`, `QA_PERSON_GROUPS` | How later steps change person, and the groups in that menu |
 | `QA_PEOPLE_SOURCE` | Where people, roles and other demo data come from |
 | `QA_LABELS_SOURCE` | Where menu labels and button texts come from |
+| `QA_SEED`, `QA_PIN`, `QA_URL_PATH`, `QA_ENV_VARS`, `QA_SITE_PREFIX` | Only for `scripts/qa-up.sh` (Setup, below). The comment at the top of the script explains each |
 
 If no file exists: `QA_TARGET` is `issue` when `~/code/server/projects.yaml` lists the repo (these
 apps are in active development), otherwise `file`. Read the other values from the code. If the
@@ -45,7 +46,7 @@ setting you need stays unclear, ask.
   `public/build/` while it builds, so a test that renders `@vite` at that moment fails with a
   missing Vite manifest, and it looks like a flaky test.
 - If `/simplify`, the gate or a fix changes code after the steps exist: run `composer qa:up`
-  again (it rebuilds everything) and update the steps the change touches.
+  (or `scripts/qa-up.sh`) again (it rebuilds everything) and update the steps the change touches.
 - **A running `npm run dev` in the worktree breaks the gate the same way.** It writes `public/hot`,
   so `Vite::manifestHash()` is null and asset-version tests fail. Do not stop the user's dev server:
   move `public/hot` aside, rerun those tests, and put it back.
@@ -54,8 +55,13 @@ setting you need stays unclear, ask.
 
 1. In the worktree, run `composer qa:up`. It needs `vendor/` (run `composer install` first in a
    fresh worktree). It runs only with `APP_ENV=local`, with Herd installed, and in a git worktree,
-   never in the main checkout. If the app has no `qa:up`, say so and stop: do not improvise a site
-   or copy a database.
+   never in the main checkout.
+   - **No `composer qa:up` in the app?** Run this skill's `scripts/qa-up.sh` from the worktree root
+     instead. It does the same: the same refusals, `herd link --secure`, undoing what Boost writes
+     while linking, a fresh `database/qa.sqlite`, the asset build, `migrate`, then the app's
+     `QA_SEED` (and `QA_PIN`, if set). It needs a demo seeder for `QA_SEED`. If the app has none,
+     write one in the same PR (it is demo data, see below) before running the script.
+   - Do not improvise any other site or copy a database.
 2. Put its URL and PIN at the top of the steps (below) and give the user the link or the path.
    Nothing else about the setup.
 
@@ -63,12 +69,13 @@ Do not talk about databases. QA always runs on the demo seed; a copy of producti
 real personal data, and the question is settled.
 
 If a check needs data that the demo does not have, add it to the demo seeders in the same PR and
-run `composer test:demo`. Hand-made data is lost on the next `qa:up`, and the user should test, not
+run `composer test:demo` (or, without that script, a test that runs the seeder). Hand-made data is lost on the next `qa:up`, and the user should test, not
 prepare.
 
 If a check needs queued jobs, start `php artisan queue:listen --tries=1` in the background.
 
-After the merge, local cleanup runs `composer qa:down` before the worktree is removed.
+After the merge, local cleanup runs `composer qa:down` (or `scripts/qa-down.sh`) before the worktree is
+removed.
 
 ## Where the steps go
 
@@ -121,7 +128,10 @@ Two sections:
 - **Exploratory checks** — 3–5 "try to break it" ideas: empty input, a very long name, a second
   tab, the wrong role, going back mid-flow.
 
-Only step 1 logs in, as `QA_LOGIN` describes. Every later change of person follows
+Only step 1 logs in, as `QA_LOGIN` describes. If a login needs a one-time (TOTP) code, give a
+copy-paste command that prints the current code from the worktree's config, for example
+`php artisan tinker --execute 'echo (new PragmaRX\Google2FA\Google2FA)->getCurrentOtp(config("app.some_totp_secret")), PHP_EOL;'`.
+Do not ask the tester to add a secret to an authenticator app. Every later change of person follows
 `QA_SWITCH_PERSON`. Take people and roles from `QA_PEOPLE_SOURCE`, and labels from
 `QA_LABELS_SOURCE`. Read them; do not write names from memory.
 
