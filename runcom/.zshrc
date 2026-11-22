@@ -26,3 +26,7 @@ export HERD_PHP_82_INI_SCAN_DIR="/Users/roberts/Library/Application Support/Herd
 export PATH="$PATH:/Users/roberts/.lmstudio/bin"
 # End of LM Studio CLI section
 
+
+
+# Herd injected PHP binary.
+export PATH="/Users/roberts/Library/Application Support/Herd/bin":$PATH

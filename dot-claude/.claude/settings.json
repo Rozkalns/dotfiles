@@ -1,10 +1,15 @@
 {
-  "model": "opus",
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
   },
   "permissions": {
     "defaultMode": "auto"
+  },
+  "model": "opus",
+  "skillOverrides": {
+    "reflections": "off",
+    "review-mr": "off",
+    "find-skills": "off"
   },
   "hooks": {
     "PreToolUse": [
@@ -31,23 +36,18 @@
     "type": "command",
     "command": "bash ~/.claude/statusline.sh"
   },
-  "skillOverrides": {
-    "reflections": "off",
-    "review-mr": "off",
-    "find-skills": "off"
-  },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": false,
-    "plugin-dev@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": false,
     "skill-creator@claude-plugins-official": false,
-    "claude-md-management@claude-plugins-official": false,
+    "claude-md-management@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": false,
     "playwright@claude-plugins-official": true,
-    "php-lsp@claude-plugins-official": true,
+    "php-lsp@claude-plugins-official": false,
     "vault-brain@claude-vault-brain": true,
     "phpstorm-plugin@phpstorm-marketplace": true,
     "reflections@claude-reflections": true,
-    "ros7skill@claude-ros7-skill": true
+    "ros7skill@claude-ros7-skill": false
   },
   "extraKnownMarketplaces": {
     "diagram-design": {
@@ -95,6 +95,6 @@
   "tui": "fullscreen",
   "showThinkingSummaries": true,
   "theme": "dark",
-  "skipAutoPermissionPrompt": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true
 }
