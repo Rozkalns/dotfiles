@@ -211,7 +211,7 @@ if [ "$mode" = pick ]; then
   awk -F'\t' -v home="$HOME" 'FILENAME == ARGV[1] { c[++n] = $0; next }
     $2 == home "/.local" || $2 == home "/.cache" { next }
     $1 >= 1048576 { for (i = 1; i <= n; i++) if (index($2, c[i]) == 1 || index(c[i], $2) == 1) next; print }' "$covered" "$latest" |
-    sort -rn | head -8 | while IFS=$'\t' read -r kb p; do printf '   %-7s %s\n' "$(human_kb "$kb")" "$(short "$p")"; done
+    sort -rn | head -8 | while IFS=$'\t' read -r kb p; do [ -e "$p" ] && printf '   %-7s %s\n' "$(human_kb "$kb")" "$(short "$p")"; done
 
   # Big files in places the folder index does not cover (~/projects, ~/Downloads, ...)
   bigs="$DATA/bigfiles-$(basename "$latest" .tsv | cut -d- -f2).tsv"
