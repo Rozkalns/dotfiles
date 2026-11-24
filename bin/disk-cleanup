@@ -100,7 +100,9 @@ leftovers() {
   keys=$(mktemp)
   installed_keys | tr 'A-Z' 'a-z' | tr -d ' ' | sort -u > "$keys"
   [ -f "$CONF/ignore" ] && ign="$CONF/ignore"
+  # Data folders named after a library, not the app that owns them
   awk -F'\t' -v as="$HOME/Library/Application Support/" -v ca="$HOME/Library/Caches/" '
+    BEGIN { owner["fluidaudio"] = "ghostpepper" }
     FILENAME == ARGV[1] { keys[++nk] = $0; next }
     FILENAME == ARGV[2] { if ($0 !~ /^#/) { g = tolower($0); gsub(/ /, "", g); ign[g] = 1 }; next }
     $1 < 204800 { next }
@@ -108,6 +110,7 @@ leftovers() {
     {
       n = $2; sub(/.*\//, "", n); n = tolower(n); gsub(/ /, "", n)
       if (n ~ /^(com\.apple|apple|google|microsoft|jetbrains|homebrew|cloudkit|crashreporter|icloud|knowledge|familycircle|callhistory|addressbook|mobilesync|syncservices|fileprovider|caches|com\.crashlytics)/ || (n in ign)) next
+      if (n in owner) n = owner[n]
       vendor = ""; if (split(n, parts, ".") >= 3) vendor = parts[2]
       for (i = 1; i <= nk; i++) {
         k = keys[i]
@@ -139,6 +142,9 @@ has npm && [ -d "$HOME/.npm" ] && add "npm cache" safe "$(size_of "$HOME/.npm")"
 add_path "codehealth-mcp cache" "$HOME/Library/Caches/codehealth-mcp" safe
 add_path "Codex runtimes cache" "$HOME/.cache/codex-runtimes" safe
 add_path "Puppeteer browsers" "$HOME/.cache/puppeteer" safe
+add_path "Composer cache" "$HOME/Library/Caches/composer" safe
+add_path "Playwright browsers (re-download on next test run)" "$HOME/Library/Caches/ms-playwright" safe
+add_path "Playwright MCP browsers (re-download on next use)" "$HOME/Library/Caches/ms-playwright-mcp" safe
 jb=()
 while IFS= read -r p; do jb+=("$p"); done < <(old_jetbrains)
 [ ${#jb[@]} -gt 0 ] && add "Old JetBrains versions (${#jb[@]} folders, newest kept)" safe "$(size_of "${jb[@]}")" \
@@ -146,6 +152,7 @@ while IFS= read -r p; do jb+=("$p"); done < <(old_jetbrains)
 add_path "Claude desktop VM (re-downloads)" "$HOME/Library/Application Support/Claude/vm_bundles" heavy
 add_path "Ollama models" "$HOME/.ollama/models" heavy
 add_path "Hugging Face models" "$HOME/.cache/huggingface/hub" heavy
+add_path "LM Studio models" "$HOME/.lmstudio/models" heavy
 add_path "Android SDK" "$HOME/Library/Android/sdk" heavy
 add_path "Android emulators (AVDs)" "$HOME/.android/avd" heavy
 
@@ -173,6 +180,7 @@ if [ "$mode" = pick ]; then
 
   while IFS=$'\t' read -r kb p; do
     [ -e "$p" ] || continue
+    for c in "${COVERED[@]}"; do [ "$p" = "$c" ] && continue 2; done
     COVERED+=("$p")
     add "Leftover, no app found: $(short "$p")" review "$(human_kb "$kb")" "rm -rf $(printf '%q' "$p")"
   done < <(leftovers "$latest")
@@ -240,8 +248,8 @@ fi
 
 before=$(free_kb)
 for i in "${picked[@]}"; do
-  if [ "${TIERS[i]}" = heavy ] && pgrep -f 'Claude.app/Contents/MacOS|ollama|qemu-system|Android Studio' >/dev/null; then
-    echo "Skipped ${LABELS[i]}: quit Claude desktop, Ollama and Android Studio/emulators first." >&2
+  if [ "${TIERS[i]}" = heavy ] && pgrep -f 'Claude.app/Contents/MacOS|ollama|qemu-system|Android Studio|LM Studio' >/dev/null; then
+    echo "Skipped ${LABELS[i]}: quit Claude desktop, Ollama, LM Studio and Android Studio/emulators first." >&2
     continue
   fi
   echo "==> ${LABELS[i]}"
