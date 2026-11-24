@@ -51,6 +51,15 @@ older_scan() {
   [ "$pick" != "$(latest_scan)" ] && echo "$pick"
 }
 
+# Single files over 1 GB anywhere in home (models, disk images), in real disk use (kb<TAB>path).
+# Skips Photos/Music libraries and iCloud, whose files may not be on disk.
+big_files() {
+  find "$HOME" -xdev \( -path "$HOME/Pictures" -o -path "$HOME/Music" \
+      -o -path "$HOME/Library/Mobile Documents" -o -path "$HOME/Library/CloudStorage" \) -prune \
+    -o -type f -size +1G -exec stat -f '%b%t%N' {} + 2>/dev/null |
+    awk -F'\t' '{ printf "%d\t%s\n", $1 / 2, $2 }'
+}
+
 scan() {
   local root out
   mkdir -p "$DATA"
@@ -63,7 +72,9 @@ scan() {
     du -sk "$HOME"/.[!.]* 2>/dev/null
   } | awk -F'\t' '$1 > 0' > "$out.tmp"
   mv "$out.tmp" "$out"
+  big_files > "$DATA/bigfiles-$(date +%Y%m%d).tsv.tmp"; mv "$DATA/bigfiles-$(date +%Y%m%d).tsv.tmp" "$DATA/bigfiles-$(date +%Y%m%d).tsv"
   ls -1t "$DATA"/scan-*.tsv | tail -n +31 | while IFS= read -r f; do rm -f "$f"; done
+  ls -1t "$DATA"/bigfiles-*.tsv 2>/dev/null | tail -n +8 | while IFS= read -r f; do rm -f "$f"; done
   local free_gb=$(( $(free_kb) / 1024 / 1024 ))
   if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
     notify "Only ${free_gb} GB free. Run disk-cleanup in Ghostty."
@@ -171,7 +182,8 @@ echo "Free now: $(free_h)"
 
 if [ "$mode" = pick ]; then
   latest=$(latest_scan)
-  if [ -z "$latest" ] || [ "$(basename "$latest" .tsv | cut -d- -f2)" -lt "$(date -v-7d +%Y%m%d)" ]; then
+  if [ -z "$latest" ] || [ "$(basename "$latest" .tsv | cut -d- -f2)" -lt "$(date -v-7d +%Y%m%d)" ] ||
+     [ ! -f "$DATA/bigfiles-$(basename "$latest" .tsv | cut -d- -f2).tsv" ]; then
     echo "Indexing folder sizes first (1-2 min)..."
     scan >/dev/null
     latest=$(latest_scan)
@@ -200,6 +212,24 @@ if [ "$mode" = pick ]; then
     $2 == home "/.local" || $2 == home "/.cache" { next }
     $1 >= 1048576 { for (i = 1; i <= n; i++) if (index($2, c[i]) == 1 || index(c[i], $2) == 1) next; print }' "$covered" "$latest" |
     sort -rn | head -8 | while IFS=$'\t' read -r kb p; do printf '   %-7s %s\n' "$(human_kb "$kb")" "$(short "$p")"; done
+
+  # Big files in places the folder index does not cover (~/projects, ~/Downloads, ...)
+  bigs="$DATA/bigfiles-$(basename "$latest" .tsv | cut -d- -f2).tsv"
+  if [ -f "$bigs" ]; then
+    awk -F'\t' 'FILENAME == ARGV[1] { if ($0 != "") c[++n] = $0; next }
+      FILENAME == ARGV[2] { c[++n] = $2 "/"; next }
+      { for (i = 1; i <= n; i++) if (index($2, c[i]) == 1) next; print }' \
+      "$covered" "$latest" "$bigs" | sort -rn |
+      while IFS=$'\t' read -r kb p; do [ -f "$p" ] && printf '%s\t%s\n' "$kb" "$p"; done > "$covered.big"
+    if [ -s "$covered.big" ]; then
+      echo
+      echo "Big files outside the folders above (over 1 GB, check by hand):"
+      head -8 "$covered.big" | while IFS=$'\t' read -r kb p; do printf '   %-7s %s\n' "$(human_kb "$kb")" "$(short "$p")"; done
+      total=$(awk -F'\t' '{ s += $1 } END { print s }' "$covered.big")
+      echo "   Total: $(human_kb "$total") in $(wc -l < "$covered.big" | tr -d ' ') files"
+    fi
+    rm -f "$covered.big"
+  fi
   rm -f "$covered"
 fi
 echo
