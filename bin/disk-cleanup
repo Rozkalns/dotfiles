@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+
+# Free disk space on macOS. Pick list + confirm by default; --scan indexes sizes (daily LaunchAgent); --run [--heavy] for scripts.
+# Never touches Docker volumes (local DB data) or personal files.
+
+set -uo pipefail
+
+DATA="$HOME/.local/share/disk-cleanup"
+CONF="$HOME/.config/disk-cleanup"
+MIN_FREE_GB=30
+[ -f "$CONF/config" ] && . "$CONF/config"
+
+mode=pick heavy=0
+for arg in "$@"; do
+  case "$arg" in
+    --run) mode=run ;;
+    --heavy) heavy=1 ;;
+    --scan) mode=scan ;;
+    -h|--help)
+      echo "Usage: disk-cleanup            pick list, then confirm"
+      echo "       disk-cleanup --scan     index folder sizes, alert when free space < ${MIN_FREE_GB} GB"
+      echo "       disk-cleanup --run [--heavy]   clear safe (and heavy) tier without asking"
+      echo "Config: $CONF/config (MIN_FREE_GB=30), $CONF/paths (extra paths), $CONF/ignore (not leftovers)"
+      exit 0 ;;
+    *) echo "Unknown option: $arg" >&2; exit 1 ;;
+  esac
+done
+
+has() { command -v "$1" >/dev/null 2>&1; }
+free_kb() { df -k / | awk 'NR==2{print $4}'; }
+free_h() { df -h / | awk 'NR==2{print $4}'; }
+size_of() { du -shc "$@" 2>/dev/null | tail -1 | cut -f1; }
+human_kb() { awk -v k="$1" 'BEGIN { if (k >= 1048576) printf "%.1fG", k / 1048576; else printf "%dM", k / 1024 }'; }
+short() { case "$1" in "$HOME"*) echo "~${1#"$HOME"}" ;; *) echo "$1" ;; esac; }
+
+notify() {
+  if has terminal-notifier; then terminal-notifier -title "Disk space" -message "$1" -execute "open -a Ghostty" >/dev/null
+  else osascript -e "display notification \"$1\" with title \"Disk space\""; fi
+}
+
+latest_scan() { ls -1 "$DATA"/scan-*.tsv 2>/dev/null | sort | tail -1; }
+
+# Newest scan at least 6 days older than the latest one, else the oldest
+older_scan() {
+  local cutoff f pick=""
+  cutoff=$(date -v-6d +%Y%m%d)
+  for f in $(ls -1 "$DATA"/scan-*.tsv 2>/dev/null | sort); do
+    [ "$(basename "$f" .tsv | cut -d- -f2)" -le "$cutoff" ] && pick=$f
+  done
+  [ -z "$pick" ] && pick=$(ls -1 "$DATA"/scan-*.tsv 2>/dev/null | sort | head -1)
+  [ "$pick" != "$(latest_scan)" ] && echo "$pick"
+}
+
+scan() {
+  local root out
+  mkdir -p "$DATA"
+  out="$DATA/scan-$(date +%Y%m%d).tsv"
+  {
+    for root in "$HOME/Library/Application Support" "$HOME/Library/Caches" "$HOME/Library/Containers" \
+                "$HOME/Library/Group Containers" "$HOME/.cache" "$HOME/.local/share"; do
+      [ -d "$root" ] && du -sk "$root"/* 2>/dev/null
+    done
+    du -sk "$HOME"/.[!.]* 2>/dev/null
+  } | awk -F'\t' '$1 > 0' > "$out.tmp"
+  mv "$out.tmp" "$out"
+  ls -1t "$DATA"/scan-*.tsv | tail -n +31 | while IFS= read -r f; do rm -f "$f"; done
+  local free_gb=$(( $(free_kb) / 1024 / 1024 ))
+  if [ "$free_gb" -lt "$MIN_FREE_GB" ]; then
+    notify "Only ${free_gb} GB free. Run disk-cleanup in Ghostty."
+  fi
+  echo "Scanned $(wc -l < "$out" | tr -d ' ') folders into $out. Free: ${free_gb} GB."
+}
+
+# JetBrains config/cache/log folders of every version except the newest per product
+old_jetbrains() {
+  local base
+  for base in "$HOME/Library/Application Support/JetBrains" "$HOME/Library/Caches/JetBrains" "$HOME/Library/Logs/JetBrains"; do
+    [ -d "$base" ] || continue
+    ls "$base" | grep -E '^[A-Za-z]+[0-9]{4}\.[0-9]+$' | sed -E 's/^([A-Za-z]+)([0-9.]+)$/\1 \2/' |
+      sort -k1,1 -k2,2V | awk -v b="$base" '{ if ($1 == p) print b "/" p v; p = $1; v = $2 }'
+  done
+}
+
+# Lower-case app names, bundle IDs and brew package names of everything installed
+installed_keys() {
+  local d a
+  for d in /Applications /Applications/Utilities "$HOME/Applications" /System/Applications; do
+    for a in "$d"/*.app; do
+      [ -d "$a" ] || continue
+      basename "$a" .app
+      /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$a/Contents/Info.plist" 2>/dev/null
+    done
+  done
+  has brew && { brew list --formula -1; brew list --cask -1; } 2>/dev/null
+}
+
+# Application Support / Caches folders >= 200 MB that match no installed app (kb<TAB>path)
+leftovers() {
+  local keys ign=/dev/null
+  keys=$(mktemp)
+  installed_keys | tr 'A-Z' 'a-z' | tr -d ' ' | sort -u > "$keys"
+  [ -f "$CONF/ignore" ] && ign="$CONF/ignore"
+  awk -F'\t' -v as="$HOME/Library/Application Support/" -v ca="$HOME/Library/Caches/" '
+    FILENAME == ARGV[1] { keys[++nk] = $0; next }
+    FILENAME == ARGV[2] { if ($0 !~ /^#/) { g = tolower($0); gsub(/ /, "", g); ign[g] = 1 }; next }
+    $1 < 204800 { next }
+    index($2, as) != 1 && index($2, ca) != 1 { next }
+    {
+      n = $2; sub(/.*\//, "", n); n = tolower(n); gsub(/ /, "", n)
+      if (n ~ /^(com\.apple|apple|google|microsoft|jetbrains|homebrew|cloudkit|crashreporter|icloud|knowledge|familycircle|callhistory|addressbook|mobilesync|syncservices|fileprovider|caches|com\.crashlytics)/ || (n in ign)) next
+      vendor = ""; if (split(n, parts, ".") >= 3) vendor = parts[2]
+      for (i = 1; i <= nk; i++) {
+        k = keys[i]
+        if (k == n || (length(k) >= 4 && length(n) >= 4 && (index(k, n) || index(n, k))) || (length(vendor) >= 4 && index(k, vendor))) next
+      }
+      print $1 "\t" $2
+    }' "$keys" "$ign" "$1"
+  rm -f "$keys"
+}
+
+[ "$mode" = scan ] && { scan; exit 0; }
+
+# Items: parallel arrays of label, tier (safe|heavy|review), size, action, path
+LABELS=() TIERS=() SIZES=() ACTIONS=() COVERED=()
+add() { LABELS+=("$1"); TIERS+=("$2"); SIZES+=("$3"); ACTIONS+=("$4"); }
+add_path() {
+  COVERED+=("$2")
+  [ -e "$2" ] && add "$1" "$3" "$(size_of "$2")" "rm -rf $(printf '%q' "$2")"
+}
+
+if has docker && docker info >/dev/null 2>&1; then
+  add "Docker images not used by any container" safe \
+    "$(docker system df --format '{{.Type}} {{.Reclaimable}}' | awk '$1=="Images"{print $2}')" \
+    "docker image prune -a -f | tail -1"
+fi
+COVERED+=("$HOME/Library/Containers/com.docker.docker" "$HOME/Library/Caches/Homebrew" "$HOME/.npm" "$HOME/Library/Caches/JetBrains" "$HOME/Library/Application Support/JetBrains")
+has brew && add "Homebrew download cache" safe "$(size_of "$(brew --cache)")" "brew cleanup --prune=all -s | tail -1"
+has npm && [ -d "$HOME/.npm" ] && add "npm cache" safe "$(size_of "$HOME/.npm")" "npm cache clean --force 2>/dev/null"
+add_path "codehealth-mcp cache" "$HOME/Library/Caches/codehealth-mcp" safe
+add_path "Codex runtimes cache" "$HOME/.cache/codex-runtimes" safe
+add_path "Puppeteer browsers" "$HOME/.cache/puppeteer" safe
+jb=()
+while IFS= read -r p; do jb+=("$p"); done < <(old_jetbrains)
+[ ${#jb[@]} -gt 0 ] && add "Old JetBrains versions (${#jb[@]} folders, newest kept)" safe "$(size_of "${jb[@]}")" \
+  "old_jetbrains | while IFS= read -r p; do rm -rf \"\$p\"; done"
+add_path "Claude desktop VM (re-downloads)" "$HOME/Library/Application Support/Claude/vm_bundles" heavy
+add_path "Ollama models" "$HOME/.ollama/models" heavy
+add_path "Hugging Face models" "$HOME/.cache/huggingface/hub" heavy
+add_path "Android SDK" "$HOME/Library/Android/sdk" heavy
+add_path "Android emulators (AVDs)" "$HOME/.android/avd" heavy
+
+# Machine-local extra paths, one per line, ~ allowed
+if [ -f "$CONF/paths" ]; then
+  while IFS= read -r p; do
+    p="${p%%#*}"; p="$(echo "$p" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+    [ -z "$p" ] && continue
+    p="${p/#\~/$HOME}"
+    add_path "Extra: $(short "$p")" "$p" review
+  done < "$CONF/paths"
+fi
+
+echo "Free now: $(free_h)"
+[ $(( $(free_kb) / 1024 / 1024 )) -lt "$MIN_FREE_GB" ] && echo "⚠️  Below the ${MIN_FREE_GB} GB limit."
+
+if [ "$mode" = pick ]; then
+  latest=$(latest_scan)
+  if [ -z "$latest" ] || [ "$(basename "$latest" .tsv | cut -d- -f2)" -lt "$(date -v-7d +%Y%m%d)" ]; then
+    echo "Indexing folder sizes first (1-2 min)..."
+    scan >/dev/null
+    latest=$(latest_scan)
+  fi
+  echo "Index from $(basename "$latest" .tsv | cut -d- -f2)."
+
+  while IFS=$'\t' read -r kb p; do
+    [ -e "$p" ] || continue
+    COVERED+=("$p")
+    add "Leftover, no app found: $(short "$p")" review "$(human_kb "$kb")" "rm -rf $(printf '%q' "$p")"
+  done < <(leftovers "$latest")
+
+  covered=$(mktemp)
+  printf '%s\n' "${COVERED[@]}" > "$covered"
+  older=$(older_scan)
+  if [ -n "$older" ]; then
+    echo
+    echo "Grew the most since $(basename "$older" .tsv | cut -d- -f2):"
+    awk -F'\t' 'FILENAME == ARGV[1] { old[$2] = $1; next } { d = $1 - old[$2]; if (d >= 512000) print d "\t" $2 }' "$older" "$latest" |
+      sort -rn | head -5 | while IFS=$'\t' read -r kb p; do printf '  +%-7s %s\n' "$(human_kb "$kb")" "$(short "$p")"; done
+  fi
+  echo
+  echo "Biggest folders not in the list (check by hand):"
+  awk -F'\t' -v home="$HOME" 'FILENAME == ARGV[1] { c[++n] = $0; next }
+    $2 == home "/.local" || $2 == home "/.cache" { next }
+    $1 >= 1048576 { for (i = 1; i <= n; i++) if (index($2, c[i]) == 1 || index(c[i], $2) == 1) next; print }' "$covered" "$latest" |
+    sort -rn | head -8 | while IFS=$'\t' read -r kb p; do printf '   %-7s %s\n' "$(human_kb "$kb")" "$(short "$p")"; done
+  rm -f "$covered"
+fi
+echo
+
+n=${#LABELS[@]}
+line() { printf '%3d) %-7s %-6s %s\n' $(($1 + 1)) "${SIZES[$1]:-0B}" "${TIERS[$1]}" "${LABELS[$1]}"; }
+[ "$n" -eq 0 ] && { echo "Nothing to clean."; exit 0; }
+
+picked=()
+if [ "$mode" = run ]; then
+  for ((i = 0; i < n; i++)); do
+    [ "${TIERS[i]}" = safe ] || { [ "${TIERS[i]}" = heavy ] && [ "$heavy" -eq 1 ]; } && picked+=("$i")
+  done
+elif [ ! -t 0 ]; then
+  for ((i = 0; i < n; i++)); do line "$i"; done
+  echo; echo "Report only (no terminal). Use --run [--heavy] to delete."
+  exit 0
+elif has fzf; then
+  while IFS= read -r num; do picked+=($((num - 1))); done < <(
+    for ((i = 0; i < n; i++)); do line "$i"; done |
+      fzf --multi --reverse --height=~60% --no-sort --prompt='clean> ' \
+        --header='Tab = tick/untick, Ctrl-A = tick all, Enter = done, Esc = quit' --bind 'ctrl-a:select-all' | awk '{ print $1 + 0 }')
+else
+  for ((i = 0; i < n; i++)); do line "$i"; done
+  echo
+  read -r -p "Pick numbers (e.g. 1 3 5), s = all safe, a = all, Enter = quit: " answer
+  case "$answer" in
+    "") exit 0 ;;
+    s) for ((i = 0; i < n; i++)); do [ "${TIERS[i]}" = safe ] && picked+=("$i"); done ;;
+    a) for ((i = 0; i < n; i++)); do picked+=("$i"); done ;;
+    *) for x in $answer; do
+         [[ "$x" =~ ^[0-9]+$ ]] && [ "$x" -ge 1 ] && [ "$x" -le "$n" ] && picked+=($((x - 1))) || echo "Ignoring: $x"
+       done ;;
+  esac
+fi
+
+[ ${#picked[@]} -eq 0 ] && { echo "Nothing picked."; exit 0; }
+
+if [ "$mode" = pick ]; then
+  echo "Final list:"
+  for i in "${picked[@]}"; do line "$i"; done
+  echo
+  read -r -p "Delete these? [y/N] " ok
+  [[ "$ok" =~ ^[yY]$ ]] || { echo "Cancelled. Nothing deleted."; exit 0; }
+fi
+
+before=$(free_kb)
+for i in "${picked[@]}"; do
+  if [ "${TIERS[i]}" = heavy ] && pgrep -f 'Claude.app/Contents/MacOS|ollama|qemu-system|Android Studio' >/dev/null; then
+    echo "Skipped ${LABELS[i]}: quit Claude desktop, Ollama and Android Studio/emulators first." >&2
+    continue
+  fi
+  echo "==> ${LABELS[i]}"
+  eval "${ACTIONS[i]}"
+done
+after=$(free_kb)
+echo
+echo "Freed: $(( (after - before) / 1024 / 1024 )) GiB. Free now: $(free_h)"
