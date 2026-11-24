@@ -23,7 +23,7 @@ cleanup = true
 # "npm" = "npm update --location global --force"
 
 [brew]
-# Off: greedy casks are listed in HOMEBREW_UPGRADE_GREEDY_CASKS (zsh.d/10-homebrew.zsh), minus phpstorm
+# Off: greedy casks are listed in HOMEBREW_UPGRADE_GREEDY_CASKS (zsh.d/10-homebrew.zsh); the LaunchAgent skips brew_cask (App Management)
 greedy_cask = false
 
 # Clean up old versions after upgrade

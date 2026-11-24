@@ -19,10 +19,10 @@
 
         {
           echo "===== Topgrade Started: $(date) =====";
-          topgrade --yes --config "$HOME/.config/topgrade/topgrade.toml" || {
+          topgrade --yes --disable brew_cask --config "$HOME/.config/topgrade/topgrade.toml" || {
             echo "First attempt failed. Retrying in 30 seconds..."
             sleep 30
-            topgrade --yes --config "$HOME/.config/topgrade/topgrade.toml"
+            topgrade --yes --disable brew_cask --config "$HOME/.config/topgrade/topgrade.toml"
           }
           echo "===== Topgrade Completed: $(date) =====";
         } 2>&amp;1
