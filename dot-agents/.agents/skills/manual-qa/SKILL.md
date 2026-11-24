@@ -111,9 +111,23 @@ site. Mark which steps belong to which PR, so the base PR can merge first.
 Where the file goes:
 
 - `QA_FILE_DIR` blank: `QA.md` in the worktree root. Check that the repo git-ignores it.
-- `QA_FILE_DIR` set: `<QA_FILE_DIR>/<ticket key, else branch>.md`. Create the folder if it is
-  missing. The file is outside the repo, so it needs no git-ignore. Give the user the full path. If
-  the file exists, it is an earlier round of the same change: update it, do not overwrite it.
+- `QA_FILE_DIR` set: `<QA_FILE_DIR>/<YYYY-MM-DD> <name>.md`, where the date is the day the first
+  QA round starts and `<name>` is the ticket key, else `<app>-<change>` (for example
+  `2026-11-23 kartites-editor-heading-toggles.md`). The date puts the folder in test order, oldest
+  first. Create the folder if it is missing. The file is outside the repo, so it needs no
+  git-ignore. Give the user the full path.
+- **If the folder is in an Obsidian vault, also give an Obsidian link.** The folder is in a vault
+  when it, or a folder above it, has a `.obsidian/` folder. Resolve symlinks first (`readlink -f`),
+  because `~/vault` can be a link. The vault name is that folder's own name. The file is its path
+  inside the vault, without `.md`, URL-encoded (`/` → `%2F`, space → `%20`). Write it as a markdown
+  link, never as a bare URL: Ghostty and similar terminals do not make a bare `obsidian://` URL
+  clickable, but a markdown link becomes a real hyperlink. Example:
+  `[Open the QA file in Obsidian](obsidian://open?vault=PersonalVault&file=QA%2F2026-11-23%20kartites-editor-heading-toggles)`.
+- Before creating one, look for `* <name>.md` in the folder (and the old undated `<name>.md`). If
+  it exists, it is an earlier round of the same change: update it, keep its date, do not overwrite
+  it.
+- After the merge, delete the file as part of the local cleanup, so the folder lists only what is
+  still to test.
 
 Start with
 `# QA — <branch>`, then the `URL:` and `PIN:` lines from the `qa:up` output, then the steps as
@@ -147,6 +161,10 @@ sentences, the expected result after "→". Less text, not more: a long step is 
   fictional roster is hard to follow.
 - **Say when a refusal is the expected result.** A step that sends a role somewhere it may not go
   ends with "→ 403" (or the message it shows), so a refusal is not reported as a bug.
+- **No bare `<placeholder>` in the steps.** Obsidian and other markdown renderers read
+  `<date and time>` as an HTML tag, and every step after it shows as raw text. Put a placeholder in
+  backticks (`` `konstrukts-<today>.xlsx` ``) or write it in words ("the date and time"). The
+  `<…>` in the template below are for you to replace, never to copy.
 
 ```markdown
 ## Scripted steps
