@@ -5,6 +5,17 @@
 - **server inventory:** `~/code/server/projects.yaml` (local only, outside this repo) is the source of truth for the personal server and its sites — per site: domains, repo, branch, deploy path, zero-downtime mode, CI, alerts, plus the deploy CLI and workflow. Read it before any server/site work instead of rediscovering layout.
 - **memory search:** when recalling something from memory, always search BOTH `~/.claude/memory/` (global) AND `~/.claude/projects/<project>/memory/` (project-specific)
 
+## Values
+
+From the [Agile Manifesto](https://agilemanifesto.org/) with its [principles](https://agilemanifesto.org/principles.html), and [No AI Slop](https://www.slopmanifesto.com/). The working agreement below is how they turn into practice.
+
+- **Small and often.** Deliver in thin slices that can merge within days. An MR or branch that waits for weeks is a smell: merge it, split it, or close it.
+
+- **The reader's cost test.** Do not hand over anything that costs the reader more to understand than it cost to produce: a 1,000-line MR, a ten-page doc, an unread agent draft. Cut it, split it, or summarise it first.
+- **Subtract before you add.** Fix the cause instead of adding a workaround. Deleting code, steps or text is often the better change.
+- **Same mistake twice → fix the system**, not just the output: a learning entry, a lint or antipattern rule, a line in a skill. If a tool can catch it, let the tool catch it.
+- **Outcomes over output.** Metrics such as MRs per week, cycle time or WIP count are signals, not goals. Never split, merge, close or time work to move a number. Fix the real neglect the number points at.
+
 ## Working agreement
 
 - **Name the deliverable in one sentence before starting** — the PR title, the file to be changed, or the command output expected. If you can't state it, you don't have the task yet: ask.
